@@ -141,3 +141,21 @@ Dashboard, Error states, Theme system (CHK024–CHK052)
 - [x] CHK050 — Are requirements for which UI elements must update on a theme switch specified? (canvas stroke colour, card backgrounds, character artwork, button styles — which are in scope?) [Completeness, Spec §FR-018, Gap]
 - [x] CHK051 — Is "without a full page reload" the complete UX specification for theme switching, or are transition animation requirements also needed? [Completeness, Spec §FR-018, Spec §CA-005]
 - [x] CHK052 — Is the default theme state on first load specified? (Dandy's World always the default, or is the theme user-selectable before starting a session?) [Completeness, Spec §FR-017, Gap]
+
+---
+
+## UI Enhancement Round 1 — April 2026
+
+The following checklist items track the 9-section UI enhancement delivered post-initial-implementation.
+
+- [x] CHK053 — **App Header**: Is the fixed navigation bar height (64 px), z-index (40), blur backdrop, and mobile hamburger breakpoint (`md`) all implemented and consistent with the theme? [Completeness, Spec §FR-024]
+- [x] CHK054 — **App Footer**: Does the footer render a 3-column grid on desktop and stack to 1 column on mobile (`md` breakpoint)? Are all three columns (logo/tagline, quick links, social icons) present? [Completeness, Spec §FR-024]
+- [x] CHK055 — **Animated Background**: Are the 12 floating SVG shapes (4 stars, 3 plus signs, 3 rings, 2 bolts) fixed, pointer-events-none, and behind all page content (`z-index: 0`)? Do they use transform-only animations with staggered delays? [Completeness, Performance]
+- [x] CHK056 — **Topic Cards**: Does each of the 4 topic cards have a distinct gradient, emoji, description, and topic-coloured glow on hover/select? Is the selected state visually distinct (glowing border + ✓ badge + lift)? [Completeness, Spec §FR-001]
+- [x] CHK057 — **Age Group Selector**: Do both cards (👦 Age 9–10 / 🧑 Age 11–12) have emoji, subtitle, and gold gradient fill + glow when selected? Is the unselected state dark-outlined? [Completeness, Spec §FR-007]
+- [x] CHK058 — **Start Practice Button**: Does the button use a yellow→amber→orange gradient? Does it lift on hover, scale-down on active, and show a pulsing `ctaPulse` glow ring when enabled? Is it visually muted when disabled? [Completeness, Spec §FR-013]
+- [x] CHK059 — **Card Container**: Is the home screen card `w-[92%]` on mobile and `lg:w-[70%]` on desktop? Do section labels use `text-xs uppercase tracking-widest` in accent purple? Are `rgba(167,139,250,0.15)` dividers between sections? [Completeness, Spec §FR-017]
+- [x] CHK060 — **Question Count Stepper**: Does the `−`/number/`+` row work as a unit? Are `−` and `+` disabled at limits (1 and 100)? Does the centre input accept direct keyboard entry and clamp to 1–100? [Completeness, Spec §FR-003]
+- [x] CHK061 — **Question Page Layout**: On `md+` breakpoints does each question card use a 2-col grid (question text left `2fr`, answer area right `3fr`) with a vertical divider? On mobile does it stack vertically (header → question → toggle → answer)? [Completeness, Spec §FR-010, Spec §FR-011]
+- [x] CHK062 — **Fraction Rendering**: Are all `a/b` patterns in question text (practice page and dashboard) rendered as stacked fractions via `FractionText.jsx`? Does prose around fractions render normally? [Completeness, Spec §FR-023]
+- [x] CHK063 — **Responsive Consistency**: Has each modified component been verified at mobile (`<640px`), tablet (`640–1023px`), and desktop (`≥1024px`) breakpoints? Key items: title font scales (`text-3xl sm:text-5xl`), card padding (`p-5 sm:p-8`), topic grid (`grid-cols-2 sm:grid-cols-4`). [Coverage, Spec §CA-004]

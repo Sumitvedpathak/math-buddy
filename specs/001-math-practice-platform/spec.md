@@ -217,14 +217,15 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
 - **FR-008**: System MUST increase question difficulty progressively from the first to the
   last question in every session.
 - **FR-009**: When Vedic Maths is a selected topic, the Vedic Maths questions allocated to
-  that topic MUST use only the four defined patterns: Teen × Teen, Teen × Reverse Teen,
-  Reverse Teen × Teen, Reverse Teen × Reverse Teen, where Teen is 11–19 inclusive and
-  Reverse Teen is any two-digit number ending in 1 (11, 21, 31, 41, 51, 61, 71, 81, 91).
-  All four patterns must appear and be distributed equally within the Vedic Maths question
-  allocation. The session as a whole MUST also include questions from other areas (Word
-  Problems, Algebra, Volumes, or general numeracy) as determined by the full topic selection
-  and the five mandatory problem types — Vedic Maths pattern questions do not constitute
-  the entire session.
+  that topic MUST draw from the full set of 23 defined problem patterns (see prompt
+  `generate_questions.txt` PATTERN LIST). Patterns include: four-digit additions/subtractions;
+  the four Teen/Reverse-Teen multiplication patterns (Teen × Teen, Teen × Reverse Teen,
+  Reverse Teen × Teen, Reverse Teen × Reverse Teen); 2-digit × 1-digit, 2×2, 3×2
+  multiplications; 2-digit ÷ single-digit and 3-digit ÷ Teen divisions; special multipliers
+  (×11, ×111, ×999, ×99, ×9999); single/double/triple digit squares; integer + mixed fraction;
+  and 2/3/4 mixed-fraction additions. The LLM MUST cycle through all patterns before
+  repeating any, to avoid repetitive question sets. All four Teen/Reverse-Teen patterns MUST
+  appear at least once when there are ≥ 4 Vedic Maths questions in the session.
 - **FR-010**: System MUST display all questions on a single scrollable page.
 - **FR-011**: Each question MUST have an independent freehand sketch canvas supporting
   mouse and touch input.
@@ -237,10 +238,12 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
   marking scheme (2: correct answer + correct method, 1: partial, 0: incorrect).
 - **FR-016**: Results dashboard MUST display per-question marks, overall score, percentage,
   topic breakdown, and encouraging age-appropriate themed feedback.
-- **FR-017**: The platform MUST ship with a "Dandy's World" default visual theme. The theme
-  MUST use original artwork and assets inspired by the game's colour palette, character style,
-  and visual aesthetic. No copyrighted game assets, screenshots, or character artwork from
-  the Dandy's World game may be reproduced or used.
+- **FR-017**: The platform MUST ship with a "Dandy's World" default visual theme using a
+  **dark vibrant palette**: deep-space background (`#0f0a1e`), electric-purple surfaces,
+  yellow-gold primary, sky-blue secondary, violet accent, neon-green accent. Theme tokens
+  are delivered via CSS custom properties on a `#theme-root` wrapper. Original artwork
+  (corner character SVGs, floating background shapes) must be inspired by the game's
+  aesthetic without reproducing any copyrighted assets.
 - **FR-018**: The theme system MUST support switching between themes without a full page
   reload.
 - **FR-019**: Adding a new practice topic MUST require no changes to the core session
@@ -257,6 +260,15 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
 - **FR-022**: Each sketch canvas MUST preserve and proportionally scale existing strokes when
   the browser window is resized. Strokes MUST NOT be lost, cleared, or misaligned as a result
   of any viewport resize event during a session.
+- **FR-023**: Fraction notation in all question text MUST be rendered as stacked fractions
+  (numerator over a horizontal bar, denominator below) rather than inline slash notation
+  (e.g. ½ not 1/2). This applies everywhere question text is displayed: the practice page
+  and the results dashboard.
+- **FR-024**: The application MUST include a persistent site-wide header (fixed, 64 px tall,
+  `z-index: 40`) containing the Math Buddy logo and primary navigation links (Home, Practice,
+  Leaderboard, About). On mobile, navigation collapses into a hamburger menu. A site-wide
+  footer MUST also be present on all screens, containing branding, quick links, and social
+  placeholder icons.
 
 ### Constitution Alignment Requirements *(mandatory)*
 
@@ -307,9 +319,9 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
 - **SC-002**: Every session delivered to a student contains exactly the five mandatory
   problem types (multiplication, division, fractions, mixed fractions, squares), verifiable
   by automated testing on 100% of generated question sets.
-- **SC-003**: All Vedic Maths questions in every session use only one of the four defined
-  patterns with correct number definitions — verifiable by automated pattern validation on
-  100% of generated Vedic questions.
+- **SC-003**: All Vedic Maths questions in every session draw from the full 23-pattern set,
+  with no pattern repeated before all others have been used — verifiable by checking pattern
+  distribution across multiple sessions.
 - **SC-004**: Difficulty progression is objectively measurable: the median difficulty rank
   of the last 25% of questions is higher than the median difficulty rank of the first 25%.
 - **SC-005**: The loading experience (progress bar + non-repeating facts) remains visible
@@ -336,8 +348,9 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
   "Age 11–12" group) to provide a slight stretch above the student's current level.
 - No user accounts, login, or persistent session history are required in v1; session data
   is lost when the browser session ends.
-- Fun facts are sourced from a pre-curated pool embedded in the application — they are not
-  LLM-generated — to avoid added latency and cost during loading.
+- Fun facts are LLM-generated as part of the single question-generation call (batched in
+  the same JSON response). A fallback pool of static facts is seeded immediately on session
+  start so the loading screen is never blank if the LLM call is slow to respond.
 - The platform targets modern browsers with HTML Canvas support; no compatibility polyfills
   for legacy browsers are in scope.
 - A single active theme is displayed at a time; theme preference is not persisted across

@@ -17,7 +17,7 @@ is applied via CSS custom properties, switchable at runtime without a page reloa
 ## Technical Context
 
 **Language/Version**: Python 3.11 (backend); JavaScript ES2022 + JSX (frontend, React 18 + Vite 5)
-**Primary Dependencies**: FastAPI 0.110+, pydantic v2, openrouter Python library, Jinja2; React 18, Vite 5, Tailwind CSS 3, react-sketch-canvas 5
+**Primary Dependencies**: FastAPI 0.110+, pydantic v2, openrouter Python library, Jinja2; React 18, Vite 5, Tailwind CSS 3, react-sketch-canvas 6.2.0
 **Storage**: None — all session state in React Context; cleared on browser tab close
 **Testing**: pytest + httpx TestClient (backend); Vitest + React Testing Library (frontend)
 **Target Platform**: Modern web browsers — Chrome 120+, Safari 17+, Firefox 121+, Edge 120+; touch-capable devices for sketch input
@@ -98,23 +98,32 @@ project-root/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── HomeScreen.jsx           # age group + topic select + question count
-│   │   │   ├── PracticePage.jsx         # all questions on one scrollable page
+│   │   │   ├── App.jsx                  # screen router + theme applier + AnimatedBackground mount
+│   │   │   ├── HomeScreen.jsx           # age group + topic select + question count (92%/70% card)
+│   │   │   ├── PracticePage.jsx         # questions — 2-col desktop layout (question left, answer right)
 │   │   │   └── Dashboard.jsx            # results after evaluation
 │   │   ├── components/
-│   │   │   ├── TopicSelector.jsx        # multi-select topic cards
-│   │   │   ├── AgeGroupSelector.jsx     # toggle: Age 9–10 or Age 11–12
-│   │   │   ├── QuestionCard.jsx         # question text + sketch/text toggle
-│   │   │   ├── SketchCanvas.jsx         # wraps react-sketch-canvas + resize handling
-│   │   │   ├── LoadingScreen.jsx        # shared: animated progress bar + rotating facts
-│   │   │   ├── ErrorBanner.jsx          # shared: themed error message + retry action
+│   │   │   ├── AppHeader.jsx            # fixed 64px nav bar; hamburger on mobile (z-40)
+│   │   │   ├── AppFooter.jsx            # 3-col footer: logo+tagline, quick links, social icons
+│   │   │   ├── AnimatedBackground.jsx   # fixed floating SVG shapes (stars/plus/ring/bolt) — 12 shapes
+│   │   │   ├── TopicSelector.jsx        # gradient cards with emoji + description + glow on select
+│   │   │   ├── AgeGroupSelector.jsx     # two styled cards: 👦 Age 9–10 / 🧑 Age 11–12
+│   │   │   ├── QuestionCard.jsx         # header strip + 2-col body (md+); stacked on mobile
+│   │   │   ├── SketchCanvas.jsx         # wraps react-sketch-canvas + resize handling; aspect-[5/2]
+│   │   │   ├── FractionText.jsx         # parses "a/b" in strings → stacked fraction SVG-style spans
+│   │   │   ├── LoadingScreen.jsx        # shared: animated progress bar + rotating facts + corner chars
+│   │   │   ├── ErrorBanner.jsx          # fixed centred modal; backdrop-blur dark overlay
 │   │   │   └── ScoreCard.jsx            # per-question result with marks and feedback
 │   │   ├── context/
-│   │   │   └── SessionContext.jsx       # all session state — in memory only
+│   │   │   └── SessionContext.jsx       # all session state — flat shape; goHome action; fallback facts seeded on start
 │   │   ├── lib/
-│   │   │   └── api.js                   # all fetch() calls to FastAPI — never call directly from components
+│   │   │   ├── api.js                   # all fetch() calls to FastAPI — never call directly from components
+│   │   │   └── topics.js                # TOPICS array with id, displayName, emoji, description, gradient, glow
+│   │   ├── assets/
+│   │   │   ├── character-left.svg       # decorative purple robot (home/loading screen corners)
+│   │   │   └── character-right.svg      # decorative blue wizard/hat (home/loading screen corners)
 │   │   ├── themes/
-│   │   │   └── dandysWorld.js           # CSS variable token set for Dandy's World theme
+│   │   │   └── dandysWorld.js           # dark vibrant palette tokens: #0f0a1e bg, yellow/violet/cyan/green accents
 │   │   └── main.jsx
 │   ├── tailwind.config.js
 │   ├── jsconfig.json                    # enables tsc --checkJs for JSDoc type checking
