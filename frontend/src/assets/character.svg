@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" fill="none">
+  <!-- Body -->
+  <ellipse cx="60" cy="110" rx="32" ry="40" fill="#f7c948"/>
+  <!-- Head -->
+  <circle cx="60" cy="54" r="34" fill="#f7c948"/>
+  <!-- Eyes -->
+  <circle cx="48" cy="50" r="7" fill="white"/>
+  <circle cx="72" cy="50" r="7" fill="white"/>
+  <circle cx="50" cy="52" r="3.5" fill="#1e293b"/>
+  <circle cx="74" cy="52" r="3.5" fill="#1e293b"/>
+  <!-- Smile -->
+  <path d="M48 66 Q60 76 72 66" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Arms -->
+  <ellipse cx="22" cy="108" rx="12" ry="20" fill="#f7c948" transform="rotate(-15 22 108)"/>
+  <ellipse cx="98" cy="108" rx="12" ry="20" fill="#f7c948" transform="rotate(15 98 108)"/>
+  <!-- Star detail -->
+  <path d="M60 80 l3 8 h8 l-6 5 2 8-7-5-7 5 2-8-6-5h8z" fill="#6ec6f0" opacity="0.7"/>
+</svg>

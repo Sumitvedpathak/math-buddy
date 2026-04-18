@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Code quality gate: Define lint/type checks for impacted backend and frontend components.
+- Layering gate: Confirm route, service, integration, model, schema, and frontend API paths
+  follow constitution folder conventions.
+- Testing gate: Define required unit, integration, and contract tests for changed behavior.
+- UX gate: Define shared UI patterns, accessibility constraints, and consistency expectations.
+- Performance gate: Define measurable frontend and backend budgets plus validation approach.
 
 ## Project Structure
 
@@ -70,18 +75,24 @@ tests/
 
 # [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
 backend/
-├── src/
+├── app/
+│   ├── api/
+│   │   └── v1/
+│   ├── integrations/
 │   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
+│   ├── schemas/
 │   └── services/
 └── tests/
+
+src/
+├── components/
+├── pages/
+└── lib/
+  └── api/
+
+tests/
+├── frontend/
+└── backend/
 
 # [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
 api/

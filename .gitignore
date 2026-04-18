@@ -1,13 +1,44 @@
-# Python-generated files
+# Python / Backend
 __pycache__/
 *.py[oc]
+*.pyd
 build/
 dist/
 wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
+*.egg-info/
+.venv/
+venv/
+env/
 .env
+.env.*
+!.env.example
+*.log
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Docker
+*.tar
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# IDE
+.vscode/
+.idea/
+*.iml
 

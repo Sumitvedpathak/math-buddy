@@ -1,0 +1,20 @@
+Generate exactly {{ facts_count }} fun facts for a maths practice loading screen.
+
+AUDIENCE: Boys aged 9–12 (age group: {{ age_group }}).
+SESSION TOPICS: {{ topics | join(", ") }}.
+
+FACT REQUIREMENTS:
+- Each fact must be surprising, short (1–2 sentences), and genuinely interesting to a child aged 9–12.
+- Topics to draw from: science, animals, space, sports, history, technology, mathematics.
+- Prefer facts that loosely relate to the session topics where natural, but do not force it.
+- All facts must be completely child-safe. No adult themes, violence, or inappropriate content.
+- No two facts in the array may repeat or overlap significantly.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON. No preamble, no markdown fences, no explanation.
+{
+  "fun_facts": [
+    "<fact 1>",
+    "<fact 2>"
+  ]
+}

@@ -90,6 +90,20 @@
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
+### Constitution Alignment Requirements *(mandatory)*
+
+- **CA-001 (Code Quality)**: Specification MUST define linting/type-check expectations for all
+  changed backend and frontend code paths.
+- **CA-002 (Architecture Boundaries)**: Specification MUST identify where route handlers,
+  services, integrations, models, schemas, and frontend API adapters will be implemented,
+  consistent with constitution path conventions.
+- **CA-003 (Testing)**: Specification MUST define required unit, integration, and contract test
+  coverage for affected behavior.
+- **CA-004 (UX Consistency)**: Specification MUST define consistency expectations for interaction
+  patterns, loading/error states, and accessibility.
+- **CA-005 (Performance)**: Specification MUST include measurable frontend/backend performance
+  targets and validation criteria.
+
 *Example of marking unclear requirements:*
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]

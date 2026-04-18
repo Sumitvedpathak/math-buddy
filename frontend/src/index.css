@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-body, 'Segoe UI', sans-serif);
+  background-color: var(--color-background, #fef9ec);
+  color: var(--color-text-primary, #1e1b14);
+}
