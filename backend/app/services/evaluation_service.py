@@ -3,6 +3,7 @@ Evaluation service: calls the LLM to mark student answers,
 computes total score and per-topic breakdown.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,8 @@ from app.schemas.evaluation import (
     AnswerSchema,
 )
 from app.schemas.questions import QuestionSchema
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 _jinja_env = Environment(loader=FileSystemLoader(str(PROMPTS_DIR)))
@@ -51,8 +54,11 @@ def _parse_llm_results(
         try:
             r = QuestionResultSchema.model_validate(item)
             result_map[r.question_id] = r
-        except (ValidationError, KeyError):
-            continue
+        except (ValidationError, KeyError) as exc:
+            logger.warning(
+                "Skipping malformed result item from LLM response",
+                extra={"item": item, "error": str(exc)},
+            )
 
     results = []
     for q in questions:
@@ -119,13 +125,40 @@ async def evaluate_answers(
         and item["answer"].content.startswith("data:image/")
     ]
 
+    logger.info(
+        "Evaluation started",
+        extra={
+            "question_count": len(request.questions),
+            "sketch_image_count": len(sketch_images),
+            "text_answer_count": sum(
+                1 for item in items
+                if item["answer"] is not None and item["answer"].mode == "text"
+            ),
+            "unanswered_count": sum(1 for item in items if item["answer"] is None),
+            "prompt_chars": len(prompt),
+        },
+    )
+
     try:
         raw = await call_llm(prompt, images=sketch_images if sketch_images else None)
     except LLMServiceError:
+        logger.error(
+            "Evaluation failed — LLM call unsuccessful",
+            extra={"question_count": len(request.questions)},
+        )
         raise
 
     results = _parse_llm_results(raw, request.questions)
     total_score, max_score, topic_breakdown = _compute_totals(results, request.questions)
+
+    logger.info(
+        "Evaluation completed",
+        extra={
+            "total_score": total_score,
+            "max_score": max_score,
+            "pct": round(total_score / max_score * 100, 1) if max_score else 0,
+        },
+    )
 
     return EvaluateAnswersResponse(
         results=results,

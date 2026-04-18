@@ -1,3 +1,4 @@
+import logging
 import re
 from pathlib import Path
 
@@ -6,6 +7,8 @@ from pydantic import ValidationError
 
 from app.integrations.openrouter import call_llm, LLMServiceError
 from app.schemas.questions import GenerateQuestionsRequest, GenerateQuestionsResponse
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 _jinja_env = Environment(loader=FileSystemLoader(str(PROMPTS_DIR)))
@@ -40,12 +43,20 @@ def _validate_response(data: dict) -> GenerateQuestionsResponse:
     try:
         response = GenerateQuestionsResponse.model_validate(data)
     except ValidationError as exc:
+        logger.warning(
+            "LLM response failed Pydantic validation",
+            extra={"validation_errors": str(exc)},
+        )
         raise ValueError(f"LLM response failed Pydantic validation: {exc}") from exc
 
     present_types = {q.problem_type for q in response.questions}
     missing = MANDATORY_TYPES - present_types
     # Only enforce all 5 types when enough questions were requested to accommodate them
     if missing and len(response.questions) >= len(MANDATORY_TYPES):
+        logger.warning(
+            "LLM response missing mandatory problem types",
+            extra={"missing_types": list(missing), "present_types": list(present_types)},
+        )
         raise ValueError(f"LLM response missing mandatory problem types: {missing}")
 
     return response
@@ -70,20 +81,51 @@ async def generate_questions(
         facts_count=FUN_FACTS_COUNT,
     )
 
+    logger.info(
+        "Question generation started",
+        extra={
+            "topics": request.topics,
+            "age_group": request.age_group,
+            "question_count": request.question_count,
+            "prompt_chars": len(prompt),
+        },
+    )
+
     last_error: Exception | None = None
     for attempt in range(MAX_RETRIES + 1):
         try:
+            if attempt > 0:
+                logger.info(
+                    "Retrying question generation",
+                    extra={"attempt": attempt + 1, "max_attempts": MAX_RETRIES + 1},
+                )
             raw = await call_llm(prompt)
             response = _validate_response(raw)
             # Sort by difficulty_tier ascending
             response.questions.sort(key=lambda q: q.difficulty_tier)
+            logger.info(
+                "Question generation succeeded",
+                extra={
+                    "question_count": len(response.questions),
+                    "fact_count": len(getattr(response, "fun_facts", []) or []),
+                    "attempt": attempt + 1,
+                },
+            )
             return response
         except (ValueError, LLMServiceError) as exc:
             last_error = exc
             if isinstance(exc, LLMServiceError):
-                # Don't retry on hard LLM failures (network/auth)
+                # Don't retry on hard LLM failures (network/auth/model-not-found)
+                logger.error(
+                    "Question generation aborted — hard LLM failure, not retrying",
+                    extra={"error": str(exc)},
+                )
                 break
+            logger.warning(
+                "Question generation validation failed, will retry",
+                extra={"attempt": attempt + 1, "error": str(exc)},
+            )
 
-    raise LLMServiceError(
-        f"Question generation failed after {MAX_RETRIES + 1} attempts: {last_error}"
-    ) from last_error
+    final_msg = f"Question generation failed after {MAX_RETRIES + 1} attempt(s): {last_error}"
+    logger.error(final_msg)
+    raise LLMServiceError(final_msg) from last_error

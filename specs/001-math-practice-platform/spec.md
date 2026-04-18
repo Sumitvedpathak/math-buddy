@@ -291,6 +291,18 @@ and shows per-question marks, totals, and a topic breakdown. This can be validat
   Question page must support at least 30 independent canvas elements without measurable
   scroll degradation. Loading screen must remain responsive during AI service calls of
   any duration.
+- **CA-006 (Observability)**: All backend errors that propagate to an HTTP response MUST
+  be logged with structured fields (at minimum: `request_id`, `model`, `status_code`,
+  `error`). The OpenRouter integration MUST distinguish and log the following failure
+  classes with actionable messages: model not found (404), authentication failure (401),
+  permission denied (403), rate limit (429), bad request / context overflow (400), network
+  connection error, and JSON parse failure. Every HTTP request/response cycle MUST emit a
+  log record with method, path, status code, and elapsed time. Unhandled exceptions that
+  reach the ASGI layer MUST be caught by a global handler, logged with a full traceback,
+  and returned to the client as a generic 500 JSON response. The log format MUST be
+  configurable: single-line JSON (default for cloud deployment) or human-readable text
+  (local development). Log level and format are set via `LOG_LEVEL` and `LOG_FORMAT`
+  environment variables.
 
 ### Key Entities *(include if feature involves data)*
 

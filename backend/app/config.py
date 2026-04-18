@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     openrouter_model: str = "google/gemini-2.0-flash-001"
     cors_origins: str = "http://localhost:5173"
 
+    # Logging
+    # log_level: DEBUG | INFO | WARNING | ERROR | CRITICAL
+    log_level: str = "INFO"
+    # log_format: "text" for local dev, "json" for cloud deployment
+    log_format: str = "text"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",")]

@@ -37,6 +37,7 @@ is applied via CSS custom properties, switchable at runtime without a page reloa
 | Testing | ✅ PASS | Unit: question type distribution, Vedic pattern validation, difficulty ordering. Integration: full round-trip for both endpoints. Contract: JSON schema assertions for both API responses. Frontend: QuestionCard toggle, LoadingScreen fact rotation, submission confirmation prompt. |
 | UX consistency | ✅ PASS | `LoadingScreen.jsx` is the single shared component for both loading phases. `ErrorBanner.jsx` is the single shared error state component. WCAG 2.2 AA required. |
 | Performance | ✅ PASS | 30 canvas budget stated. CSS variable theme swap <100ms. Indeterminate Tailwind animation for loading. LLM calls are async; UI thread never blocked. |
+| Observability | ✅ PASS | `logging_config.py` centralises all log config. `openrouter.py` classifies HTTP 400/401/403/404/429 and connection errors with actionable messages. Request middleware emits method/path/status/elapsed per request. Global ASGI exception handler catches unhandled 500s with full traceback. `LOG_LEVEL`/`LOG_FORMAT` env vars control verbosity and JSON vs text output. |
 
 **Documented exceptions:**
 
@@ -65,8 +66,9 @@ specs/001-math-practice-platform/
 project-root/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                      # FastAPI app, router registration, CORS middleware
-│   │   ├── config.py                    # loads OPENROUTER_API_KEY, OPENROUTER_MODEL from .env
+│   │   ├── main.py                      # FastAPI app, CORS, request-logging middleware, global exception handler, startup event
+│   │   ├── config.py                    # Settings: OPENROUTER_API_KEY, OPENROUTER_MODEL, LOG_LEVEL, LOG_FORMAT
+│   │   ├── logging_config.py            # configure_logging(): JSON (cloud) or text formatter; request_id ContextVar
 │   │   ├── api/
 │   │   │   └── v1/
 │   │   │       ├── questions.py         # POST /api/v1/questions/generate
@@ -92,7 +94,7 @@ project-root/
 │   │   │   └── test_api_endpoints.py
 │   │   └── contract/
 │   │       └── test_api_contracts.py
-│   ├── .env                             # OPENROUTER_API_KEY, OPENROUTER_MODEL
+│   ├── .env                             # OPENROUTER_API_KEY, OPENROUTER_MODEL, LOG_LEVEL, LOG_FORMAT
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
