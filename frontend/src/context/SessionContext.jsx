@@ -138,6 +138,10 @@ export function SessionProvider({ children }) {
     }))
   }, [])
 
+  const goHome = useCallback(() => {
+    setState((s) => ({ ...INITIAL_STATE, ageGroup: s.ageGroup, selectedTopics: s.selectedTopics, questionCount: s.questionCount, screen: 'home' }))
+  }, [])
+
   const actions = {
     setAgeGroup,
     toggleTopic,
@@ -146,6 +150,7 @@ export function SessionProvider({ children }) {
     startSession,
     submitAnswers,
     resetSession,
+    goHome,
   }
 
   return (

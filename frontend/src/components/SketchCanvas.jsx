@@ -3,8 +3,7 @@ import { ReactSketchCanvas } from 'react-sketch-canvas'
 
 /**
  * SketchCanvas — SVG-backed freehand drawing surface.
- * Uses ResizeObserver to handle layout changes while preserving strokes
- * via exportPaths / loadPaths round-trip.
+ * aspect-[5/2] gives ~40% less height than 4/3 while filling full card width.
  *
  * @param {Object} props
  * @param {string} props.questionId - Unique question ID (used as a key)
@@ -33,7 +32,15 @@ export default function SketchCanvas({ questionId, onExport, className = '' }) {
 
   return (
     <div className={`relative w-full ${className}`}>
-      <div className="aspect-[4/3] w-full overflow-hidden rounded-card border-2 border-primary/30 bg-white">
+      {/* aspect-[5/2]: ~40% shorter than 4/3, full card width */}
+      <div
+        className="aspect-[5/2] w-full overflow-hidden rounded-card"
+        style={{
+          border: '2px solid rgba(167,139,250,0.4)',
+          background: '#f8f7ff',
+          boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.15)',
+        }}
+      >
         <ReactSketchCanvas
           ref={canvasRef}
           key={questionId}
@@ -50,10 +57,15 @@ export default function SketchCanvas({ questionId, onExport, className = '' }) {
         <button
           type="button"
           onClick={handleClear}
-          className="rounded-button bg-surface px-3 py-1 text-sm font-medium text-text-secondary shadow-sm hover:bg-primary/10 active:scale-95 transition"
+          className="rounded-button px-3 py-1 text-xs font-bold transition hover:opacity-80 active:scale-95"
+          style={{
+            background: 'rgba(167,139,250,0.15)',
+            color: '#a78bfa',
+            border: '1px solid rgba(167,139,250,0.3)',
+          }}
           aria-label="Clear canvas"
         >
-          Clear
+          🧹 Clear
         </button>
       </div>
     </div>

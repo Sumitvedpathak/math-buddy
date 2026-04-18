@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 260" fill="none">
+  <!-- Body -->
+  <ellipse cx="80" cy="180" rx="48" ry="60" fill="#a78bfa"/>
+  <!-- Belly glow -->
+  <ellipse cx="80" cy="185" rx="28" ry="36" fill="#7c3aed" opacity="0.5"/>
+  <!-- Head -->
+  <circle cx="80" cy="88" r="52" fill="#c4b5fd"/>
+  <!-- Eyes -->
+  <circle cx="62" cy="82" r="12" fill="white"/>
+  <circle cx="98" cy="82" r="12" fill="white"/>
+  <circle cx="65" cy="84" r="6" fill="#4c1d95"/>
+  <circle cx="101" cy="84" r="6" fill="#4c1d95"/>
+  <!-- Eye shine -->
+  <circle cx="67" cy="81" r="2.5" fill="white"/>
+  <circle cx="103" cy="81" r="2.5" fill="white"/>
+  <!-- Smile -->
+  <path d="M62 106 Q80 122 98 106" stroke="#4c1d95" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Cheeks -->
+  <ellipse cx="52" cy="100" rx="10" ry="6" fill="#f9a8d4" opacity="0.7"/>
+  <ellipse cx="108" cy="100" rx="10" ry="6" fill="#f9a8d4" opacity="0.7"/>
+  <!-- Antenna -->
+  <line x1="80" y1="36" x2="80" y2="8" stroke="#a78bfa" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="80" cy="6" r="7" fill="#facc15"/>
+  <circle cx="80" cy="6" r="4" fill="#fef08a"/>
+  <!-- Arms -->
+  <ellipse cx="28" cy="165" rx="16" ry="32" fill="#a78bfa" transform="rotate(-15 28 165)"/>
+  <ellipse cx="132" cy="165" rx="16" ry="32" fill="#a78bfa" transform="rotate(15 132 165)"/>
+  <!-- Hands -->
+  <circle cx="18" cy="196" r="12" fill="#c4b5fd"/>
+  <circle cx="142" cy="196" r="12" fill="#c4b5fd"/>
+  <!-- Legs -->
+  <ellipse cx="62" cy="240" rx="16" ry="20" fill="#7c3aed"/>
+  <ellipse cx="98" cy="240" rx="16" ry="20" fill="#7c3aed"/>
+  <!-- Star on belly -->
+  <polygon points="80,168 83,178 94,178 85,184 88,194 80,188 72,194 75,184 66,178 77,178" fill="#facc15"/>
+</svg>

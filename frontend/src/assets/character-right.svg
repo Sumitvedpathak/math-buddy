@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 260" fill="none">
+  <!-- Body -->
+  <ellipse cx="80" cy="180" rx="48" ry="60" fill="#38bdf8"/>
+  <!-- Belly glow -->
+  <ellipse cx="80" cy="185" rx="28" ry="36" fill="#0284c7" opacity="0.5"/>
+  <!-- Head -->
+  <circle cx="80" cy="88" r="52" fill="#7dd3fc"/>
+  <!-- Hat -->
+  <ellipse cx="80" cy="42" rx="42" ry="10" fill="#0ea5e9"/>
+  <rect x="52" y="10" width="56" height="34" rx="10" fill="#0ea5e9"/>
+  <ellipse cx="80" cy="10" rx="28" ry="8" fill="#38bdf8"/>
+  <!-- Hat star -->
+  <polygon points="80,16 83,24 92,24 85,29 87,38 80,33 73,38 75,29 68,24 77,24" fill="#facc15" transform="scale(0.6) translate(53 0)"/>
+  <!-- Eyes -->
+  <circle cx="62" cy="86" r="12" fill="white"/>
+  <circle cx="98" cy="86" r="12" fill="white"/>
+  <circle cx="65" cy="88" r="6" fill="#0c4a6e"/>
+  <circle cx="101" cy="88" r="6" fill="#0c4a6e"/>
+  <circle cx="67" cy="85" r="2.5" fill="white"/>
+  <circle cx="103" cy="85" r="2.5" fill="white"/>
+  <!-- Smile -->
+  <path d="M62 108 Q80 126 98 108" stroke="#0c4a6e" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Cheeks -->
+  <ellipse cx="52" cy="102" rx="10" ry="6" fill="#f9a8d4" opacity="0.7"/>
+  <ellipse cx="108" cy="102" rx="10" ry="6" fill="#f9a8d4" opacity="0.7"/>
+  <!-- Arms -->
+  <ellipse cx="28" cy="165" rx="16" ry="32" fill="#38bdf8" transform="rotate(-15 28 165)"/>
+  <ellipse cx="132" cy="165" rx="16" ry="32" fill="#38bdf8" transform="rotate(15 132 165)"/>
+  <!-- Hands waving -->
+  <circle cx="18" cy="196" r="12" fill="#7dd3fc"/>
+  <circle cx="142" cy="192" r="12" fill="#7dd3fc"/>
+  <!-- Legs -->
+  <ellipse cx="62" cy="240" rx="16" ry="20" fill="#0284c7"/>
+  <ellipse cx="98" cy="240" rx="16" ry="20" fill="#0284c7"/>
+  <!-- Neon math symbol on belly -->
+  <text x="68" y="192" font-size="28" font-family="monospace" font-weight="bold" fill="#4ade80">+</text>
+</svg>

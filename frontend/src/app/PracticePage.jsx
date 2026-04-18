@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useSession } from '../context/SessionContext'
 import QuestionCard from '../components/QuestionCard'
+import ErrorBanner from '../components/ErrorBanner'
 
 /**
  * PracticePage — renders all questions and handles submission.
@@ -12,9 +13,7 @@ export default function PracticePage() {
   const [confirming, setConfirming] = useState(false)
 
   const handleAnswer = useCallback(
-    (questionId, mode, content) => {
-      setAnswer(questionId, mode, content)
-    },
+    (questionId, mode, content) => { setAnswer(questionId, mode, content) },
     [setAnswer]
   )
 
@@ -36,21 +35,28 @@ export default function PracticePage() {
 
   return (
     <main className="min-h-screen px-4 py-8">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <header className="flex items-center justify-between">
-          <h1 className="font-heading text-2xl font-extrabold text-primary-dark">
-            Practice — {questions.length} Questions
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto w-[95%] max-w-5xl space-y-5">
+        {/* Page header */}
+        <header className="text-center py-4">
+          <h1
+            className="font-heading text-3xl font-extrabold sm:text-4xl"
+            style={{ color: '#facc15', textShadow: '0 0 28px rgba(250,204,21,0.45)' }}
+          >
+            📚 {questions.length} {questions.length === 1 ? 'Question' : 'Questions'}
           </h1>
+          <p className="mt-1 text-sm font-medium" style={{ color: '#a89ec4' }}>
+            Answer each question below — sketch or type!
+          </p>
         </header>
 
-        {error && (
-          <div role="alert" className="rounded-card bg-red-100 p-4 text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
         {/* Question list */}
-        <ol className="space-y-6 list-none p-0">
+        <ol className="space-y-5 list-none p-0">
           {questions.map((q, i) => (
             <li key={q.id}>
               <QuestionCard
@@ -63,17 +69,25 @@ export default function PracticePage() {
           ))}
         </ol>
 
-        {/* Submit */}
-        <div className="sticky bottom-4 flex justify-center">
+        {/* Submit button */}
+        <div className="sticky bottom-4 flex justify-center pb-4">
           <button
             type="button"
             onClick={handleSubmitClick}
-            className="rounded-button bg-primary px-8 py-3 font-heading text-lg font-bold text-white shadow-lg hover:bg-primary/90 active:scale-95 transition"
+            className="rounded-button px-10 py-4 font-heading text-xl font-extrabold transition-all duration-200 hover:scale-105 active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+              color: '#0f0a1e',
+              boxShadow: '0 0 24px rgba(74,222,128,0.4), 0 4px 16px rgba(0,0,0,0.4)',
+            }}
           >
-            Submit Answers
+            ✅ Submit Answers
           </button>
         </div>
       </div>
+
+      {/* Error modal */}
+      {error && <ErrorBanner message={error} onRetry={() => submitAnswers(answers)} />}
 
       {/* Empty-submission confirmation dialog */}
       {confirming && (
@@ -81,27 +95,41 @@ export default function PracticePage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
-          className="fixed inset-0 flex items-center justify-center bg-black/40 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
         >
-          <div className="w-full max-w-sm rounded-card bg-white p-6 shadow-xl space-y-4">
-            <h2 id="confirm-title" className="font-heading text-lg font-bold text-text-primary">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+          <div
+            className="relative w-full max-w-sm rounded-card p-6 shadow-2xl space-y-4"
+            style={{
+              background: 'rgba(26,16,53,0.95)',
+              border: '1px solid rgba(167,139,250,0.35)',
+              boxShadow: '0 0 40px rgba(167,139,250,0.2)',
+            }}
+          >
+            <h2 id="confirm-title" className="font-heading text-lg font-bold" style={{ color: '#f0e6ff' }}>
               Are you sure?
             </h2>
-            <p className="font-body text-sm text-text-secondary">
-              You haven't answered any questions yet. Submit anyway?
+            <p className="font-body text-sm" style={{ color: '#a89ec4' }}>
+              You haven&apos;t answered any questions yet. Submit anyway?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
                 onClick={cancelSubmit}
-                className="rounded-button px-4 py-2 text-sm font-medium text-text-secondary hover:bg-primary/10 transition"
+                className="rounded-button px-4 py-2 text-sm font-medium transition hover:bg-white/10"
+                style={{ color: '#a89ec4' }}
               >
                 Go back
               </button>
               <button
                 type="button"
                 onClick={confirmSubmit}
-                className="rounded-button bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90 transition"
+                className="rounded-button px-4 py-2 text-sm font-bold transition active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #facc15, #eab308)',
+                  color: '#0f0a1e',
+                  boxShadow: '0 0 12px rgba(250,204,21,0.3)',
+                }}
               >
                 Submit anyway
               </button>

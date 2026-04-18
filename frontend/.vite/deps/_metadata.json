@@ -1,0 +1,31 @@
+{
+  "hash": "d40f62c4",
+  "configHash": "b3271d50",
+  "lockfileHash": "baceb17b",
+  "browserHash": "2f12b218",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "77bf1093",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "849dc760",
+      "needsInterop": true
+    },
+    "react-sketch-canvas": {
+      "src": "../../node_modules/react-sketch-canvas/dist/react-sketch-canvas.esm.js",
+      "file": "react-sketch-canvas.js",
+      "fileHash": "ff4f6799",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-UTEJFLXC": {
+      "file": "chunk-UTEJFLXC.js"
+    }
+  }
+}

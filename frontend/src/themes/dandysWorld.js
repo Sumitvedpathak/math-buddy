@@ -1,8 +1,9 @@
 /** @type {import('./themes/dandysWorld').Theme} */
 
 /**
- * Dandy's World-inspired theme tokens.
- * Colour palette uses soft pastels with bold accent colours reminiscent of the game's aesthetic.
+ * Dandy's World-inspired theme tokens — dark vibrant edition.
+ * Deep purples, electric blues, bright yellows, and neon greens for an
+ * exciting, engaging feel aimed at 9–12 year old kids.
  * All values are CSS custom property name → value pairs.
  *
  * @type {Object}
@@ -18,18 +19,19 @@ export const theme = {
   characterAsset: new URL('../assets/character.svg', import.meta.url).href,
   bgTileAsset: new URL('../assets/bg-tile.svg', import.meta.url).href,
   cssVars: {
-    '--color-primary': '#f7c948',
-    '--color-primary-dark': '#d9a800',
-    '--color-secondary': '#6ec6f0',
-    '--color-accent': '#f97316',
-    '--color-background': '#fef9ec',
-    '--color-surface': '#ffffff',
-    '--color-surface-raised': '#fffbe8',
-    '--color-text-primary': '#1e1b14',
-    '--color-text-secondary': '#5c5340',
-    '--color-success': '#22c55e',
-    '--color-warning': '#f59e0b',
-    '--color-error': '#ef4444',
+    '--color-primary': '#facc15',
+    '--color-primary-dark': '#eab308',
+    '--color-secondary': '#38bdf8',
+    '--color-accent': '#a78bfa',
+    '--color-accent-green': '#4ade80',
+    '--color-background': '#0f0a1e',
+    '--color-surface': '#1a1035',
+    '--color-surface-raised': '#241848',
+    '--color-text-primary': '#f0e6ff',
+    '--color-text-secondary': '#a89ec4',
+    '--color-success': '#4ade80',
+    '--color-warning': '#facc15',
+    '--color-error': '#f87171',
     '--color-canvas-stroke': '#1e1b14',
     '--font-heading': '"Nunito", "Comic Sans MS", cursive',
     '--font-body': '"Nunito", "Segoe UI", sans-serif',

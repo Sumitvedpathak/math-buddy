@@ -23,12 +23,42 @@ DIFFICULTY ORDERING:
 Assign each question an integer difficulty_tier starting at 1. Questions MUST be ordered ascending by difficulty_tier — the first question should be the easiest and the last the hardest. The difficulty_tier values must reflect genuine grade-level complexity: simpler operations, smaller numbers, and fewer steps for lower tiers.
 
 VEDIC MATHS RULES (apply only when "Vedic Maths" is among the selected topics):
+Definitions:
 - "Teen" means any integer from 11 to 19 inclusive.
 - "Reverse Teen" means any two-digit integer whose units digit is 1: 11, 21, 31, 41, 51, 61, 71, 81, 91.
-- Vedic Maths questions must use ONLY these four patterns: Teen × Teen, Teen × Reverse Teen, Reverse Teen × Teen, Reverse Teen × Reverse Teen.
-- ALL FOUR patterns must appear among the Vedic Maths questions. Distribute them equally.
-- Example valid: "13 × 17", "15 × 31", "21 × 14", "31 × 41"
-- Example invalid: "12 × 25" (25 is not a Teen or Reverse Teen)
+
+Vedic Maths questions MUST draw from ALL of the following problem patterns. Distribute them as evenly as possible across the Vedic Maths question slots. Cycle through the full list so each session uses a wide variety — do NOT repeat the same pattern more than once unless you have exhausted all patterns.
+
+PATTERN LIST (use each label verbatim in your internal planning):
+1.  four_digit_addition        – 4-digit + 4-digit  (e.g. 3456 + 2789)
+2.  four_digit_subtraction     – 4-digit − 4-digit  (e.g. 7812 − 3459)
+3.  teen_x_teen                – Teen × Teen  (e.g. 13 × 17)
+4.  teen_x_reverse_teen        – Teen × Reverse Teen  (e.g. 15 × 31)
+5.  reverse_teen_x_teen        – Reverse Teen × Teen  (e.g. 21 × 14)
+6.  reverse_teen_x_reverse_teen – Reverse Teen × Reverse Teen  (e.g. 31 × 41)
+7.  two_digit_x_single         – 2-digit × 1-digit  (e.g. 47 × 8)
+8.  two_digit_x_two_digit      – 2-digit × 2-digit  (e.g. 36 × 48)
+9.  three_digit_x_two_digit    – 3-digit × 2-digit  (e.g. 124 × 37)
+10. two_digit_div_single       – 2-digit ÷ 1-digit  (e.g. 72 ÷ 9)
+11. three_digit_div_teen       – 3-digit ÷ Teen  (e.g. 546 ÷ 13)
+12. four_digit_x_11            – 4-digit × 11  (e.g. 3142 × 11)
+13. five_digit_x_111           – 5-digit × 111  (e.g. 12345 × 111)
+14. three_digit_x_999          – 3-digit × 999  (e.g. 456 × 999)
+15. four_digit_x_99            – 4-digit × 99  (e.g. 2345 × 99)
+16. two_digit_x_9999           – 2-digit × 9999  (e.g. 47 × 9999)
+17. single_digit_square        – Single digit²  (e.g. 9²)
+18. double_digit_square        – 2-digit²  (e.g. 37²)
+19. three_digit_square         – 3-digit²  (e.g. 125²)
+20. integer_plus_mixed_frac    – Whole number + mixed fraction  (e.g. 24 + 3¾)
+21. two_mixed_frac_addition    – Two mixed fractions added  (e.g. 2½ + 3¾)
+22. three_mixed_frac_addition  – Three mixed fractions added  (e.g. 1¼ + 2½ + 3¾)
+23. four_mixed_frac_addition   – Four mixed fractions added  (e.g. 1½ + 2¼ + 3¾ + 1⅓)
+
+Rules:
+- Spread the Vedic Maths question slots across as many distinct patterns as possible.
+- ALL FOUR multiplication patterns (teen_x_teen, teen_x_reverse_teen, reverse_teen_x_teen, reverse_teen_x_reverse_teen) MUST each appear at least once per session if there are ≥ 4 Vedic Maths questions.
+- Numbers must be valid for the pattern (e.g. for four_digit_x_11 the first operand must be exactly 4 digits).
+- Invalid example: "12 × 25" as a teen_x_teen (25 is not a Teen or Reverse Teen).
 
 CHILD SAFETY:
 - All question text must be entirely appropriate for children aged 9–12.
