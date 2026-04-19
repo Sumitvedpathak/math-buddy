@@ -71,6 +71,23 @@ After viewing their results, students see a short, positive message tailored to 
 
 ---
 
+### User Story 5 - Vedic Maths Technique Evaluation (Priority: P1)
+
+For questions specifically tagged as Vedic Maths problems, students receive step-by-step evaluation based on the specific Vedic technique(s) required (e.g., Vertically and Crosswise, All from 9 and last from 10), ensuring they learn and apply these mental math shortcuts correctly.
+
+**Why this priority**: Vedic Maths requires specific techniques that differ from standard methods. Evaluating these correctly is essential for students learning this curriculum, making it a P1 requirement alongside standard problem evaluation.
+
+**Independent Test**: Can be tested by submitting a Vedic Maths problem (e.g., two-digit multiplication using Vertically and Crosswise) and verifying the dashboard shows steps specific to that Vedic technique, not generic multiplication steps. Delivers value by teaching proper Vedic methods.
+
+**Acceptance Scenarios**:
+
+1. **Given** a Vedic Maths multiplication question (e.g., 23 × 14) tagged as requiring "Vertically and Crosswise" technique, **When** the student's answer shows the Vedic method steps (vertical products, cross products, combining), **Then** each Vedic step is evaluated separately and awarded 0.25 marks if correct
+2. **Given** a Vedic Maths subtraction question using "All from 9 and last from 10" technique, **When** the student applies the technique correctly, **Then** the step breakdown shows the Vedic-specific steps (complement calculation, adjustment) not standard borrowing steps
+3. **Given** a student solves a Vedic Maths problem using standard method instead of the required Vedic technique, **When** viewing the dashboard, **Then** marks are awarded for mathematical correctness but feedback notes "Try using the Vedic technique [name] for faster calculation" with model solution showing both methods
+4. **Given** a Vedic Maths question, **When** the model solution is displayed, **Then** it includes the Vedic technique name, explanation of why it's faster, and step-by-step walkthrough using that specific technique
+
+---
+
 ### Edge Cases
 
 - What happens when a student's sketch is completely illegible and no steps can be identified? (System awards 0/total, notes "Unable to read handwriting clearly", encourages trying text input or clearer sketch)
@@ -78,6 +95,8 @@ After viewing their results, students see a short, positive message tailored to 
 - What if the student uses a valid alternative solution method with different steps? (LLM must recognize multiple valid approaches and award marks if the student's steps are logically sound, even if different from the expected method)
 - How does the system determine required steps for a novel or unusual question type? (LLM analyzes question complexity and age appropriateness to define reasonable steps — if uncertain, defaults to broader steps to avoid over-penalization)
 - What happens when there's ambiguity in text answers (e.g., "2+3=5" on one line vs. separate lines)? (LLM interprets the student's intent based on mathematical logic and awards marks for correct working regardless of formatting)
+- **How does the system evaluate Vedic Maths problems when students use standard methods?** (System awards full marks for correct mathematical working but provides feedback encouraging the Vedic technique, with model solution showing the Vedic approach for comparison)
+- **What if a Vedic Maths question can be solved using multiple Vedic techniques?** (System accepts any valid Vedic technique for the problem type, identifying which technique was used and evaluating steps accordingly)
 
 ## Requirements *(mandatory)*
 
@@ -98,6 +117,9 @@ After viewing their results, students see a short, positive message tailored to 
 - **FR-013**: Dashboard summary MUST reflect the new fractional total score with variable maximum based on total steps across all questions
 - **FR-014**: System MUST recognize and credit valid alternative solution methods, not just a single expected approach
 - **FR-015**: Local development environment MUST support full testing of step-based evaluation before cloud deployment
+- **FR-016**: For questions tagged as Vedic Maths, system MUST identify and evaluate steps based on the specific Vedic technique(s) applicable to that problem (e.g., Vertically and Crosswise, All from 9 and last from 10, Nikhilam method)
+- **FR-017**: For Vedic Maths questions, model solutions MUST include the name of the Vedic technique, explanation of why it's efficient, and step-by-step walkthrough using that technique
+- **FR-018**: System MUST accept both Vedic technique and standard method solutions for Vedic Maths questions, awarding full marks for correct working while encouraging Vedic approach in feedback
 
 ### Constitution Alignment Requirements *(mandatory)*
 
@@ -109,9 +131,9 @@ After viewing their results, students see a short, positive message tailored to 
 
 ### Key Entities
 
-- **EvaluationStep**: Represents a single required step in a solution, including step number, description, whether student completed it correctly (boolean), student's attempt (text/expression or null if not visible), correct value/expression, and marks awarded (0 or 0.25)
-- **StepBasedScore**: Represents the score for a single question, including question ID, total marks earned (sum of step marks), maximum possible marks (number of steps × 0.25), list of EvaluationSteps, and score ratio (earned/max) for personalized feedback
-- **ModelSolution**: Represents the complete walkthrough for a question, including question ID, list of numbered solution steps (each with description and explanation), age-appropriate language level indicator, and optional diagram/visual hint if applicable
+- **EvaluationStep**: Represents a single required step in a solution, including step number, description, whether student completed it correctly (boolean), student's attempt (text/expression or null if not visible), correct value/expression, marks awarded (0 or 0.25), and optional Vedic technique name if applicable
+- **StepBasedScore**: Represents the score for a single question, including question ID, total marks earned (sum of step marks), maximum possible marks (number of steps × 0.25), list of EvaluationSteps, score ratio (earned/max) for personalized feedback, and optional flag indicating if Vedic technique was used
+- **ModelSolution**: Represents the complete walkthrough for a question, including question ID, list of numbered solution steps (each with description and explanation), age-appropriate language level indicator, optional Vedic technique name and explanation if applicable, and optional diagram/visual hint
 - **SessionEvaluation**: Represents the overall session results, including session ID, list of StepBasedScores for all questions, total session score (sum of all question scores), total maximum score (sum of all question max scores), and evaluation timestamp
 
 ## Success Criteria *(mandatory)*
@@ -119,18 +141,19 @@ After viewing their results, students see a short, positive message tailored to 
 ### Measurable Outcomes
 
 - **SC-001**: Students and parents can view a complete step-by-step breakdown for every submitted answer within 3 seconds of loading the dashboard
-- **SC-002**: System correctly identifies and scores individual steps in at least 90% of typical math problems for the target age groups (multiplication, division, fractions, decimals, word problems)
+- **SC-002**: System correctly identifies and scores individual steps in at least 90% of typical math problems for the target age groups (multiplication, division, fractions, decimals, word problems, and Vedic Maths techniques)
 - **SC-003**: Model solutions are comprehensible to 9-12 year old students, verified by readability scores (Flesch-Kincaid Grade Level 4-6) and parent/teacher feedback
 - **SC-004**: Students who review step breakdowns and model solutions show measurable improvement (at least 15% higher scores) on similar subsequent problems within the same session or next session
 - **SC-005**: Sketch answer step identification accuracy is at least 75% for clear handwriting (as measured by comparison with expert human evaluation of the same sketches)
 - **SC-006**: System handles sessions with up to 10 questions containing 30+ total steps with evaluation completing in under 15 seconds
 - **SC-007**: Dashboard renders step breakdowns without layout shift or flicker, maintaining 60 FPS during scroll
 - **SC-008**: At least 80% of students/parents find the step-by-step feedback "helpful" or "very helpful" in post-session surveys
+- **SC-009**: For Vedic Maths questions, system correctly identifies the specific Vedic technique used by the student in at least 85% of cases where the technique is clearly applied
 
 ## Assumptions
 
 - Students will submit answers with at least some visible working (either in sketches or text); completely blank answers receive 0/total with guidance to show working
-- The existing OpenRouter LLM integration (Gemini 2.5 Flash Lite) has sufficient reasoning capability to accurately break down problems into steps and evaluate student working
+- The existing OpenRouter LLM integration (Gemini 2.5 Flash Lite) has sufficient reasoning capability to accurately break down problems into steps and evaluate student working, including recognition of Vedic Maths techniques
 - The current answer schema already captures both text and image data needed for evaluation; if not, schema updates are in scope
 - Step complexity will align with standard curriculum expectations for ages 9-12 (UK primary school years 5-7 or equivalent)
 - Model solution language targets reading comprehension at grade 4-6 level (ages 9-12), using short sentences and familiar vocabulary
@@ -139,3 +162,6 @@ After viewing their results, students see a short, positive message tailored to 
 - Local testing with representative question types and answer samples is sufficient before cloud deployment; full production load testing is out of scope for this feature
 - The LLM's step evaluation is the source of truth; no manual override mechanism is required in v1
 - Performance targets assume typical GCP Cloud Run scaling behavior observed in existing deployment
+- For Vedic Maths questions, the LLM has knowledge of common Vedic techniques (Vertically and Crosswise, All from 9 and last from 10, Nikhilam, Ekadhikena Purvena, etc.) and can recognize their application in student answers
+- Questions are properly tagged in the system to indicate when Vedic Maths techniques are expected versus standard methods
+- Vedic Maths curriculum coverage is appropriate for ages 9-12 learning these techniques as mental math shortcuts
