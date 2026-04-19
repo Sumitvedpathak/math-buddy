@@ -89,13 +89,17 @@ export function SessionProvider({ children }) {
         screen: 'practice',
       }))
     } catch (err) {
-      const retryFn = () => startSession()
+      console.error('[startSession] error:', err)
+      const message = typeof err === 'string' 
+        ? err 
+        : (err?.message || 'Could not generate questions. Please check your connection and try again.')
+      
       setState((s) => ({
         ...s,
         screen: 'home',
         error: {
-          message: 'Could not generate questions. Please check your connection and try again.',
-          retryFn,
+          message,
+          retryFn: () => startSession(),
         },
       }))
     }
@@ -115,13 +119,17 @@ export function SessionProvider({ children }) {
       const result = await evaluateAnswers(state.questions, answersArray)
       setState((s) => ({ ...s, evaluationResult: result, screen: 'dashboard' }))
     } catch (err) {
-      const retryFn = () => submitAnswers(exportedAnswers)
+      console.error('[submitAnswers] error:', err)
+      const message = typeof err === 'string' 
+        ? err 
+        : (err?.message || 'Could not evaluate answers. Please check your connection and try again.')
+
       setState((s) => ({
         ...s,
         screen: 'practice',
         error: {
-          message: 'Could not evaluate answers. Please check your connection and try again.',
-          retryFn,
+          message,
+          retryFn: () => submitAnswers(exportedAnswers),
         },
       }))
     }

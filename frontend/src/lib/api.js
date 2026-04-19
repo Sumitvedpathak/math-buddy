@@ -22,7 +22,9 @@
  * @property {Record<string, {score: number, maxScore: number, questionCount: number}>} topicBreakdown
  */
 
-const BASE_URL = '/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1` 
+  : '/api/v1'
 
 /**
  * @param {string} url
