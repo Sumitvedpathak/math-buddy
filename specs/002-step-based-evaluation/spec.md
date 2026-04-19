@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "Update the answer evaluation system to score student answers based on individual solution steps rather than a single overall mark. Also add a full step-by-step model solution to every question result on the dashboard so kids can learn the correct method."
 
+## Clarifications
+
+### Session 2026-04-19
+
+- Q: How should the system handle OpenRouter API failures (timeout, 500 error, rate limit)? → A: Store answers locally/backend, show "Evaluation in progress" message, automatically retry up to 3 times with exponential backoff, then show error banner with manual retry button
+- Q: Where should step-by-step evaluation results be stored? → A: Frontend only (SessionStorage/LocalStorage) for initial testing, data lost on browser close/clear
+- Q: Should step count vary by age group for the same problem type? → A: Same steps for both age groups, but evaluation should be flexible - recognize equivalent approaches and focus on core conceptual steps rather than rigid matching; LLM steps and student steps may vary but ultimately main steps should be present
+- Q: When viewing the dashboard, should step breakdown require additional LLM calls? → A: No - complete evaluation (step breakdown + model solution) happens in single LLM call when answers are submitted; dashboard simply displays pre-generated data with no additional API calls
+- Q: If LLM's step breakdown is clearly wrong, what should the system do? → A: Use LLM result as-is with focus on answer correctness; step breakdown quality issues are acceptable but final answer/score must be correct
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View Detailed Step Breakdown for Submitted Answers (Priority: P1)
@@ -92,11 +102,14 @@ For questions specifically tagged as Vedic Maths problems, students receive step
 
 - What happens when a student's sketch is completely illegible and no steps can be identified? (System awards 0/total, notes "Unable to read handwriting clearly", encourages trying text input or clearer sketch)
 - How does the system handle a correct final answer but missing or incorrect intermediate steps? (Awards marks only for clearly demonstrated correct steps, not for the final answer alone)
-- What if the student uses a valid alternative solution method with different steps? (LLM must recognize multiple valid approaches and award marks if the student's steps are logically sound, even if different from the expected method)
+- What if the student uses a valid alternative solution method with different steps? (LLM must recognize multiple valid approaches and award marks if the student's steps are logically sound, even if different from the expected method; evaluation should be flexible and focus on core conceptual steps)
 - How does the system determine required steps for a novel or unusual question type? (LLM analyzes question complexity and age appropriateness to define reasonable steps — if uncertain, defaults to broader steps to avoid over-penalization)
 - What happens when there's ambiguity in text answers (e.g., "2+3=5" on one line vs. separate lines)? (LLM interprets the student's intent based on mathematical logic and awards marks for correct working regardless of formatting)
 - **How does the system evaluate Vedic Maths problems when students use standard methods?** (System awards full marks for correct mathematical working but provides feedback encouraging the Vedic technique, with model solution showing the Vedic approach for comparison)
 - **What if a Vedic Maths question can be solved using multiple Vedic techniques?** (System accepts any valid Vedic technique for the problem type, identifying which technique was used and evaluating steps accordingly)
+- **What happens if the OpenRouter API is completely unavailable?** (After 3 automatic retry attempts with exponential backoff, system shows error banner: "Evaluation service temporarily unavailable. Your answers are saved. Please try again in a few minutes." with manual "Try Again" button)
+- **What if browser crashes or closes before evaluation completes?** (Answers stored in SessionStorage are lost; student must re-submit answers; future backend persistence would address this)
+- **What if LLM's step breakdown is obviously wrong but answer score is correct?** (Use LLM result as-is; step breakdown quality issues are acceptable as long as final answer/score is correct; no automatic validation or fallback)
 
 ## Requirements *(mandatory)*
 
@@ -115,11 +128,14 @@ For questions specifically tagged as Vedic Maths problems, students receive step
 - **FR-011**: System MUST provide encouraging feedback messages personalized to the score ratio for each question
 - **FR-012**: System MUST calculate overall session score as the sum of all question scores
 - **FR-013**: Dashboard summary MUST reflect the new fractional total score with variable maximum based on total steps across all questions
-- **FR-014**: System MUST recognize and credit valid alternative solution methods, not just a single expected approach
+- **FR-014**: System MUST recognize and credit valid alternative solution methods, not just a single expected approach; step evaluation should be flexible and focus on core conceptual steps rather than rigid exact matching
 - **FR-015**: Local development environment MUST support full testing of step-based evaluation before cloud deployment
 - **FR-016**: For questions tagged as Vedic Maths, system MUST identify and evaluate steps based on the specific Vedic technique(s) applicable to that problem (e.g., Vertically and Crosswise, All from 9 and last from 10, Nikhilam method)
 - **FR-017**: For Vedic Maths questions, model solutions MUST include the name of the Vedic technique, explanation of why it's efficient, and step-by-step walkthrough using that technique
 - **FR-018**: System MUST accept both Vedic technique and standard method solutions for Vedic Maths questions, awarding full marks for correct working while encouraging Vedic approach in feedback
+- **FR-019**: System MUST perform complete evaluation (step breakdown, scoring, model solution) in a single LLM API call when answers are submitted; dashboard displays pre-generated results with no additional LLM calls
+- **FR-020**: When OpenRouter API call fails, system MUST store answers locally, display "Evaluation in progress" message, automatically retry up to 3 times with exponential backoff, then show error banner with manual retry if all attempts fail
+- **FR-021**: Evaluation results (step breakdown, scores, model solutions) MUST be stored in frontend SessionStorage/LocalStorage for v1; data persists until browser close or storage clear
 
 ### Constitution Alignment Requirements *(mandatory)*
 
@@ -155,13 +171,15 @@ For questions specifically tagged as Vedic Maths problems, students receive step
 - Students will submit answers with at least some visible working (either in sketches or text); completely blank answers receive 0/total with guidance to show working
 - The existing OpenRouter LLM integration (Gemini 2.5 Flash Lite) has sufficient reasoning capability to accurately break down problems into steps and evaluate student working, including recognition of Vedic Maths techniques
 - The current answer schema already captures both text and image data needed for evaluation; if not, schema updates are in scope
-- Step complexity will align with standard curriculum expectations for ages 9-12 (UK primary school years 5-7 or equivalent)
+- Step complexity will align with standard curriculum expectations for ages 9-12 (UK primary school years 5-7 or equivalent), with same step count for both age groups
 - Model solution language targets reading comprehension at grade 4-6 level (ages 9-12), using short sentences and familiar vocabulary
 - Parents/teachers reviewing the dashboard understand fractional scoring (e.g., 1.25/2.0) without additional UI explanation beyond tooltips
 - The existing dashboard infrastructure can accommodate additional content (step breakdowns, model solutions) without major refactoring
 - Local testing with representative question types and answer samples is sufficient before cloud deployment; full production load testing is out of scope for this feature
-- The LLM's step evaluation is the source of truth; no manual override mechanism is required in v1
+- The LLM's step evaluation is the source of truth; no manual override mechanism is required in v1; step breakdown quality issues are acceptable as long as final answer/score is correct
 - Performance targets assume typical GCP Cloud Run scaling behavior observed in existing deployment
 - For Vedic Maths questions, the LLM has knowledge of common Vedic techniques (Vertically and Crosswise, All from 9 and last from 10, Nikhilam, Ekadhikena Purvena, etc.) and can recognize their application in student answers
 - Questions are properly tagged in the system to indicate when Vedic Maths techniques are expected versus standard methods
 - Vedic Maths curriculum coverage is appropriate for ages 9-12 learning these techniques as mental math shortcuts
+- For v1, evaluation results stored in frontend only (SessionStorage/LocalStorage); backend database persistence is out of scope
+- Transient API failures are handled via automatic retry with exponential backoff; persistent failures display user-facing error with manual retry option
