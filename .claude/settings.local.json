@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(speckit-specify)",
+      "Bash(dir C:\\\\Users\\\\axiom\\\\AI\\\\Apps\\\\math-buddy\\\\specs *)",
+      "Skill(speckit-clarify)",
+      "Bash(dir C:\\\\Users\\\\axiom\\\\AI\\\\Apps\\\\math-buddy\\\\specs\\\\002-eduspark-dark-theme *)",
+      "Skill(speckit-tasks)",
+      "Skill(speckit-implement)"
+    ]
+  }
+}

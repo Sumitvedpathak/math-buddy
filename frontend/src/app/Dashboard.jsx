@@ -1,12 +1,6 @@
 import { useSession } from '../context/SessionContext'
-import ScoreCard from '../components/ScoreCard'
 import FractionText from '../components/FractionText'
 
-/**
- * Best-effort label for what the student submitted when marks < 2.
- * @param {{ studentAnswer?: string, marks: number }} result
- * @param {{ mode: string, content: string }|null|undefined} submitted
- */
 function getStudentAnswerLine(result, submitted) {
   const fromLlm = result.studentAnswer?.trim()
   if (fromLlm) return fromLlm
@@ -18,9 +12,13 @@ function getStudentAnswerLine(result, submitted) {
   return null
 }
 
-/**
- * Dashboard — shows evaluation results: total score, topic breakdown, per-question feedback.
- */
+function contextualMessage(pct) {
+  if (pct === 100) return 'Flawless. That\'s mastery.'
+  if (pct >= 70)  return 'Strong work. A few refinements and you\'re there.'
+  if (pct >= 40)  return 'Good effort — review the working, then try again.'
+  return 'Keep practising — every attempt builds intuition.'
+}
+
 export default function Dashboard() {
   const { state, resetSession } = useSession()
   const { evaluationResult, questions, answers: answersRaw } = state
@@ -28,8 +26,8 @@ export default function Dashboard() {
 
   if (!evaluationResult) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-text-secondary">No results available.</p>
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-ink-soft">No results available.</p>
       </main>
     )
   }
@@ -39,110 +37,120 @@ export default function Dashboard() {
   const percent = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
 
   return (
-    <main className="min-h-screen px-4 py-10">
-      <div className="mx-auto max-w-2xl space-y-8">
-        {/* Hero score */}
-        <section className="rounded-card bg-primary p-5 text-center text-white shadow-lg sm:p-8">
-          <h1 className="font-heading text-3xl font-extrabold sm:text-4xl">
-            {totalScore} / {maxScore}
-          </h1>
-          <p className="mt-1 font-body text-lg opacity-90">{percent}% correct</p>
-          <p className="mt-3 font-body text-sm opacity-75">
-            {percent >= 80 ? '🎉 Outstanding work!' : percent >= 50 ? 'Good effort, keep going!' : 'Keep practising, you can do it!'}
-          </p>
-        </section>
+    <main className="mx-auto max-w-5xl px-6 py-12 md:py-16 space-y-12">
 
-        {/* Topic breakdown */}
-        {Object.keys(topicBreakdown).length > 0 && (
-          <section className="space-y-4">
-            <h2 className="font-heading text-xl font-bold text-text-primary">By Topic</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {Object.entries(topicBreakdown).map(([topic, data]) => (
-                <ScoreCard
-                  key={topic}
-                  topic={topic}
-                  score={data.score}
-                  maxScore={data.maxScore}
-                  questionCount={data.questionCount}
-                />
-              ))}
+      {/* ── Score hero ── */}
+      <section className="rounded-3xl overflow-hidden ring-soft-lg bg-card">
+        <div className="grid md:grid-cols-[1.2fr_1fr]">
+
+          {/* Left — score */}
+          <div className="p-10 md:p-14 bg-primary text-primary-foreground relative overflow-hidden">
+            <div className="absolute inset-0 grid-paper opacity-[0.08] pointer-events-none" aria-hidden="true" />
+            <div className="relative">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary-foreground/60">/ Results</p>
+              <div className="mt-4 flex items-baseline gap-3">
+                <span className="font-display text-7xl md:text-8xl font-semibold leading-none">{totalScore}</span>
+                <span className="font-display text-3xl text-primary-foreground/60">/ {maxScore}</span>
+              </div>
+              <p className="mt-3 text-lg text-primary-foreground/80">{percent}% correct</p>
+              <p className="mt-6 max-w-sm text-sm text-primary-foreground/70 leading-relaxed">
+                {contextualMessage(percent)}
+              </p>
             </div>
-          </section>
-        )}
+          </div>
 
-        {/* Per-question feedback */}
-        <section className="space-y-4">
-          <h2 className="font-heading text-xl font-bold text-text-primary">Question Review</h2>
-          <ol className="space-y-3 list-none p-0">
-            {results.map((r, i) => {
-              const q = questionMap[r.questionId]
-              const submitted = answers[r.questionId]
-              const studentLine = r.marks < 2 ? getStudentAnswerLine(r, submitted) : null
-              const showAnswers = r.marks < 2 && (studentLine || r.correctAnswer)
-              return (
-                <li key={r.questionId} className="rounded-card bg-surface p-4 shadow-sm space-y-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-body text-sm font-semibold text-text-primary flex-1">
-                      <span className="mr-2 text-text-secondary">#{i + 1}</span>
-                      {q ? <FractionText text={q.text} fontSize="0.9em" /> : r.questionId}
-                    </p>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        r.marks === 2
-                          ? 'bg-green-100 text-green-700'
-                          : r.marks === 1
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-600'
-                      }`}
-                    >
-                      {r.marks}/2
-                    </span>
+          {/* Right — topic breakdown + CTA */}
+          <div className="p-10 md:p-14">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ By topic</p>
+            <ul className="mt-5 space-y-4">
+              {Object.entries(topicBreakdown).map(([topic, data]) => (
+                <li key={topic}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="font-medium text-ink capitalize">{topic}</span>
+                    <span className="font-mono text-ink-soft">{data.score} / {data.maxScore}</span>
                   </div>
-                  <p className="font-body text-sm text-text-secondary">{r.feedback}</p>
-                  {showAnswers && (
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                     <div
-                      className="mt-3 space-y-2 rounded-lg border px-3 py-2.5"
-                      style={{
-                        borderColor: 'rgba(167,139,250,0.25)',
-                        background: 'rgba(15,10,30,0.45)',
-                      }}
-                    >
-                      {studentLine && (
-                        <p className="font-body text-sm leading-snug" style={{ color: '#fecaca' }}>
-                          <span className="font-bold text-red-200">Your answer: </span>
-                          <FractionText text={studentLine} fontSize="0.95em" />
-                        </p>
-                      )}
-                      {!studentLine && submitted?.mode === 'sketch' && r.marks < 2 && r.correctAnswer && (
-                        <p className="font-body text-xs italic" style={{ color: '#a89ec4' }}>
-                          Your answer was a sketch — compare with the correct answer below.
-                        </p>
-                      )}
-                      {r.correctAnswer && (
-                        <p className="font-body text-sm leading-snug" style={{ color: '#bbf7d0' }}>
-                          <span className="font-bold text-green-200">Correct answer: </span>
-                          <FractionText text={r.correctAnswer} fontSize="0.95em" />
-                        </p>
-                      )}
-                    </div>
-                  )}
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${(data.score / data.maxScore) * 100}%` }}
+                    />
+                  </div>
                 </li>
-              )
-            })}
-          </ol>
-        </section>
-
-        {/* Try again */}
-        <div className="flex justify-center pb-8">
-          <button
-            type="button"
-            onClick={resetSession}
-            className="rounded-button bg-primary px-8 py-3 font-heading text-lg font-bold text-white shadow-lg hover:bg-primary/90 active:scale-95 transition"
-          >
-            Try Again
-          </button>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={resetSession}
+              className="mt-8 w-full inline-flex items-center justify-center gap-2 rounded-md bg-ink text-background px-5 py-3 text-sm font-medium hover:opacity-90"
+              aria-label="Start a new set"
+            >
+              Start a new set
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* ── Question review ── */}
+      <section>
+        <h2 className="font-display text-3xl font-semibold text-ink">Question review</h2>
+        <p className="mt-1 text-ink-soft">Read each one carefully — the working is half the lesson.</p>
+
+        <div className="mt-6 space-y-3">
+          {results.map((r, i) => {
+            const q = questionMap[r.questionId]
+            const submitted = answers[r.questionId]
+            const studentLine = r.marks < 2 ? getStudentAnswerLine(r, submitted) : null
+            const isCorrect = r.marks === 2
+            const showAnswers = r.marks < 2 && (studentLine || r.correctAnswer)
+
+            return (
+              <article key={r.questionId} className="rounded-xl bg-card ring-soft p-6">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start gap-3">
+                    <span className="font-mono text-xs text-muted-foreground mt-1">#{i + 1}</span>
+                    <p className="font-display text-lg leading-snug text-ink max-w-3xl">
+                      {q ? <FractionText text={q.text} /> : r.questionId}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+                    isCorrect
+                      ? 'bg-success/15 text-success'
+                      : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {isCorrect ? 'Correct' : 'Review'}
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm text-ink-soft leading-relaxed pl-8">{r.feedback}</p>
+
+                {showAnswers && (
+                  <div className="mt-4 grid md:grid-cols-2 gap-3 pl-8">
+                    {(studentLine || (submitted?.mode === 'sketch' && r.correctAnswer)) && (
+                      <div className="rounded-lg border border-border bg-surface-elevated p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Your answer</p>
+                        <p className="mt-1 text-sm text-ink font-mono break-words">
+                          {studentLine
+                            ? <FractionText text={studentLine} />
+                            : <em className="not-italic text-muted-foreground">(sketch submitted)</em>
+                          }
+                        </p>
+                      </div>
+                    )}
+                    {r.correctAnswer && (
+                      <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-success">Correct answer</p>
+                        <p className="mt-1 text-sm text-ink font-mono">
+                          <FractionText text={r.correctAnswer} />
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
+      </section>
     </main>
   )
 }

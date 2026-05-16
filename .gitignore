@@ -42,3 +42,5 @@ Thumbs.db
 .idea/
 *.iml
 
+#Non Required folders
+darktheme/

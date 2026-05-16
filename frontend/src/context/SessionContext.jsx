@@ -9,7 +9,7 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  */
 
 /**
- * @typedef {"home"|"loading"|"practice"|"evaluating"|"dashboard"} AppScreen
+ * @typedef {"home"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"} AppScreen
  */
 
 /**
@@ -150,6 +150,11 @@ export function SessionProvider({ children }) {
     setState((s) => ({ ...INITIAL_STATE, ageGroup: s.ageGroup, selectedTopics: s.selectedTopics, questionCount: s.questionCount, screen: 'home' }))
   }, [])
 
+  // Changes screen without resetting any session state — safe for nav links
+  const navigateTo = useCallback((screen) => {
+    setState((s) => ({ ...s, screen }))
+  }, [])
+
   const actions = {
     setAgeGroup,
     toggleTopic,
@@ -159,6 +164,7 @@ export function SessionProvider({ children }) {
     submitAnswers,
     resetSession,
     goHome,
+    navigateTo,
   }
 
   return (

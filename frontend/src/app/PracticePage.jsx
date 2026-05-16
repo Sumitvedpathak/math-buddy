@@ -1,16 +1,27 @@
 import { useState, useCallback } from 'react'
 import { useSession } from '../context/SessionContext'
+import { TOPICS } from '../lib/topics'
 import QuestionCard from '../components/QuestionCard'
 import ErrorBanner from '../components/ErrorBanner'
 
-/**
- * PracticePage — renders all questions and handles submission.
- * Confirms before submitting if no answers have been provided.
- */
+const AGE_GROUPS = [
+  { id: '9-10',  title: 'Age 9–10',  subtitle: 'Junior Explorer — ~Grade 3–4' },
+  { id: '11-12', title: 'Age 11–12', subtitle: 'Senior Champion — ~Grade 5–6' },
+]
+
+const QUICK_COUNTS = [5, 10, 20, 30]
+
 export default function PracticePage() {
-  const { state, setAnswer, submitAnswers } = useSession()
-  const { questions, answers, error } = state
+  const {
+    state,
+    setAgeGroup, toggleTopic, setQuestionCount, startSession,
+    setAnswer, submitAnswers,
+  } = useSession()
+  const { questions, answers, error, ageGroup, selectedTopics, questionCount } = state
   const [confirming, setConfirming] = useState(false)
+
+  // Show setup when no questions have been loaded yet
+  const isSetup = questions.length === 0
 
   const handleAnswer = useCallback(
     (questionId, mode, content) => { setAnswer(questionId, mode, content) },
@@ -33,103 +44,103 @@ export default function PracticePage() {
 
   const cancelSubmit = useCallback(() => setConfirming(false), [])
 
+  if (isSetup) {
+    return <SetupStage
+      ageGroup={ageGroup}
+      setAgeGroup={setAgeGroup}
+      selectedTopics={selectedTopics}
+      toggleTopic={toggleTopic}
+      questionCount={questionCount}
+      setQuestionCount={setQuestionCount}
+      onStart={startSession}
+    />
+  }
+
+  const answeredCount = Object.values(answers).filter((a) => a && a.content).length
+
   return (
-    <main className="min-h-screen px-4 py-8">
-      {/* Ambient glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
-      </div>
+    <main className="mx-auto max-w-5xl px-6 py-12 md:py-16">
+      {/* Session header */}
+      <header className="mb-10 text-center">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ Session in progress</p>
+        <h1 className="mt-3 font-display text-4xl md:text-5xl font-semibold text-ink">
+          {questions.length} {questions.length === 1 ? 'Question' : 'Questions'}
+        </h1>
+        <p className="mt-2 text-ink-soft">Sketch or type your answer — both are saved automatically.</p>
+        <div className="mt-6 mx-auto max-w-md">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>{answeredCount} of {questions.length} answered</span>
+            <span>{Math.round((answeredCount / questions.length) * 100)}%</span>
+          </div>
+          <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      </header>
 
-      <div className="relative mx-auto w-[95%] max-w-5xl space-y-5">
-        {/* Page header */}
-        <header className="text-center py-4">
-          <h1
-            className="font-heading text-3xl font-extrabold sm:text-4xl"
-            style={{ color: '#facc15', textShadow: '0 0 28px rgba(250,204,21,0.45)' }}
-          >
-            📚 {questions.length} {questions.length === 1 ? 'Question' : 'Questions'}
-          </h1>
-          <p className="mt-1 text-sm font-medium" style={{ color: '#a89ec4' }}>
-            Answer each question below — sketch or type!
-          </p>
-        </header>
+      {/* Question list */}
+      <ol className="space-y-5 list-none p-0">
+        {questions.map((q, i) => (
+          <li key={q.id}>
+            <QuestionCard
+              question={q}
+              answer={answers[q.id] ?? null}
+              onAnswer={handleAnswer}
+              questionNumber={i + 1}
+            />
+          </li>
+        ))}
+      </ol>
 
-        {/* Question list */}
-        <ol className="space-y-5 list-none p-0">
-          {questions.map((q, i) => (
-            <li key={q.id}>
-              <QuestionCard
-                question={q}
-                answer={answers[q.id] ?? null}
-                onAnswer={handleAnswer}
-                questionNumber={i + 1}
-              />
-            </li>
-          ))}
-        </ol>
-
-        {/* Submit button */}
-        <div className="sticky bottom-4 flex justify-center pb-4">
+      {/* Sticky submit */}
+      <div className="sticky bottom-6 mt-10 z-30">
+        <div className="mx-auto max-w-md">
           <button
             type="button"
             onClick={handleSubmitClick}
-            className="rounded-button px-10 py-4 font-heading text-xl font-extrabold transition-all duration-200 hover:scale-105 active:scale-95"
-            style={{
-              background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
-              color: '#0f0a1e',
-              boxShadow: '0 0 24px rgba(74,222,128,0.4), 0 4px 16px rgba(0,0,0,0.4)',
-            }}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-success px-6 py-3.5 text-sm font-semibold text-success-foreground hover:opacity-90 ring-soft-lg"
           >
-            ✅ Submit Answers
+            ✓ Submit answers
           </button>
         </div>
       </div>
 
-      {/* Error modal */}
-      {error && <ErrorBanner message={error} onRetry={() => submitAnswers(answers)} />}
+      {error && <ErrorBanner message={error.message ?? error} onRetry={() => submitAnswers(answers)} />}
 
-      {/* Empty-submission confirmation dialog */}
+      {/* Empty-submission confirmation */}
       {confirming && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-ink/40 backdrop-blur-sm p-4"
+          onClick={cancelSubmit}
         >
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
           <div
-            className="relative w-full max-w-sm rounded-card p-6 shadow-2xl space-y-4"
-            style={{
-              background: 'rgba(26,16,53,0.95)',
-              border: '1px solid rgba(167,139,250,0.35)',
-              boxShadow: '0 0 40px rgba(167,139,250,0.2)',
-            }}
+            className="w-full max-w-md rounded-2xl bg-card ring-soft-lg p-7"
+            onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="confirm-title" className="font-heading text-lg font-bold" style={{ color: '#f0e6ff' }}>
+            <h3 id="confirm-title" className="font-display text-2xl font-semibold text-ink">
               Are you sure?
-            </h2>
-            <p className="font-body text-sm" style={{ color: '#a89ec4' }}>
-              You haven&apos;t answered any questions yet. Submit anyway?
+            </h3>
+            <p className="mt-2 text-sm text-ink-soft">
+              You haven&apos;t answered any questions yet. Unanswered questions will receive 0 marks.
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={cancelSubmit}
-                className="rounded-button px-4 py-2 text-sm font-medium transition hover:bg-white/10"
-                style={{ color: '#a89ec4' }}
+                className="rounded-md px-4 py-2 text-sm text-ink-soft hover:bg-muted"
               >
                 Go back
               </button>
               <button
                 type="button"
                 onClick={confirmSubmit}
-                className="rounded-button px-4 py-2 text-sm font-bold transition active:scale-95"
-                style={{
-                  background: 'linear-gradient(135deg, #facc15, #eab308)',
-                  color: '#0f0a1e',
-                  boxShadow: '0 0 12px rgba(250,204,21,0.3)',
-                }}
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
               >
                 Submit anyway
               </button>
@@ -138,5 +149,173 @@ export default function PracticePage() {
         </div>
       )}
     </main>
+  )
+}
+
+/* ── Setup Stage ── */
+function SetupStage({ ageGroup, setAgeGroup, selectedTopics, toggleTopic, questionCount, setQuestionCount, onStart }) {
+  const canStart = selectedTopics.length > 0
+
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
+      <header className="mb-10">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ New practice set</p>
+        <h1 className="mt-3 font-display text-4xl md:text-5xl font-semibold text-ink">Configure your session</h1>
+        <p className="mt-3 text-ink-soft max-w-2xl">
+          Three quick choices. We&apos;ll generate a focused, mixed set tailored to your selection.
+        </p>
+      </header>
+
+      <div className="rounded-2xl bg-card ring-soft overflow-hidden">
+
+        {/* 01 Age group */}
+        <Section number="01" title="Age group" hint="Difficulty scales with your selection.">
+          <div className="grid sm:grid-cols-2 gap-3">
+            {AGE_GROUPS.map((g) => {
+              const active = ageGroup === g.id
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setAgeGroup(g.id)}
+                  className={[
+                    'text-left rounded-xl border p-5 transition-all',
+                    active
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                      : 'border-border bg-surface hover:border-ink/20',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-lg font-semibold text-ink">{g.title}</span>
+                    <span className={`h-4 w-4 rounded-full border-2 ${active ? 'border-primary bg-primary' : 'border-border'}`} />
+                  </div>
+                  <p className="mt-1 text-sm text-ink-soft">{g.subtitle}</p>
+                </button>
+              )
+            })}
+          </div>
+        </Section>
+
+        {/* 02 Topics */}
+        <Section number="02" title="Topics" hint="Pick one or more — we'll mix them.">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {TOPICS.filter((t) => t.enabled).map((t) => {
+              const active = selectedTopics.includes(t.id)
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleTopic(t.id)}
+                  className={[
+                    'text-left rounded-xl border p-4 transition-all',
+                    active
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                      : 'border-border bg-surface hover:border-ink/20',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-2xl text-primary">{t.emoji}</span>
+                    <span className={`h-4 w-4 rounded border-2 grid place-items-center ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>
+                      {active && <span className="text-[10px] leading-none">✓</span>}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 font-display text-base font-semibold text-ink">{t.displayName}</h3>
+                  <p className="mt-1 text-xs text-ink-soft">{t.description}</p>
+                </button>
+              )
+            })}
+          </div>
+          {selectedTopics.length === 0 && (
+            <p className="mt-3 text-xs text-destructive" role="alert">
+              Please select at least one topic to continue.
+            </p>
+          )}
+        </Section>
+
+        {/* 03 Question count */}
+        <Section number="03" title="Number of questions" hint="Between 1 and 100.">
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="inline-flex items-center rounded-lg border border-border bg-surface overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setQuestionCount(Math.max(1, questionCount - 1))}
+                className="h-12 w-12 grid place-items-center text-ink-soft hover:bg-muted hover:text-ink"
+                aria-label="Decrease question count"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                value={questionCount}
+                min={1}
+                max={100}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (!isNaN(v) && v >= 1 && v <= 100) setQuestionCount(v)
+                }}
+                aria-label="Number of questions"
+                className="w-20 text-center font-display text-2xl font-semibold text-ink bg-transparent focus:outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <button
+                type="button"
+                onClick={() => setQuestionCount(Math.min(100, questionCount + 1))}
+                className="h-12 w-12 grid place-items-center text-ink-soft hover:bg-muted hover:text-ink"
+                aria-label="Increase question count"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {QUICK_COUNTS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setQuestionCount(n)}
+                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    questionCount === n ? 'bg-ink text-background' : 'bg-muted text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Section>
+      </div>
+
+      {/* CTA */}
+      <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
+        <p className="text-sm text-ink-soft">
+          {canStart ? (
+            <>Ready: <strong className="text-ink">{questionCount}</strong> questions across{' '}
+            <strong className="text-ink">{selectedTopics.length}</strong> topic{selectedTopics.length > 1 ? 's' : ''}.</>
+          ) : 'Select topics to continue.'}
+        </p>
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={!canStart}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground ring-soft-lg transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Start practice
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Section({ number, title, hint, children }) {
+  return (
+    <div className="border-b border-border last:border-b-0 p-6 md:p-8">
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-5">
+        <h2 className="font-display text-xl font-semibold text-ink">
+          <span className="font-mono text-xs text-primary mr-3 tracking-wider">{number}</span>
+          {title}
+        </h2>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      </div>
+      {children}
+    </div>
   )
 }

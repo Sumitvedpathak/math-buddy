@@ -31,7 +31,9 @@ describe('PracticePage', () => {
   it('renders all questions', () => {
     renderWithSession()
     expect(screen.getByText('144 ÷ 12')).toBeInTheDocument()
-    expect(screen.getByText('3/6')).toBeInTheDocument()
+    // FractionText renders "3/6" as a stacked fraction (separate spans for numerator and denominator)
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('6')).toBeInTheDocument()
   })
 
   it('shows a submit button', () => {

@@ -5,20 +5,15 @@ import HomeScreen from './HomeScreen'
 import LoadingScreen from '../components/LoadingScreen'
 import PracticePage from './PracticePage'
 import Dashboard from './Dashboard'
+import Leaderboard from './Leaderboard'
+import About from './About'
 import ErrorBanner from '../components/ErrorBanner'
 import AppHeader from '../components/AppHeader'
 import AppFooter from '../components/AppFooter'
-import AnimatedBackground from '../components/AnimatedBackground'
 
-/**
- * Top-level screen router.
- * Reads `screen` from SessionContext and renders the appropriate component.
- * The `#theme-root` wrapper is the single element that receives all CSS variables.
- */
 export default function App() {
   const { state } = useSession()
 
-  // Apply default theme on first mount
   useEffect(() => {
     setTheme(theme)
   }, [])
@@ -35,15 +30,17 @@ export default function App() {
         return <LoadingScreen funFacts={state.funFacts} message="Marking your answers…" />
       case 'dashboard':
         return <Dashboard />
+      case 'leaderboard':
+        return <Leaderboard />
+      case 'about':
+        return <About />
       default:
         return <HomeScreen />
     }
   }
 
   return (
-    <div id="theme-root" className="flex min-h-screen flex-col font-body"
-      style={{ background: 'linear-gradient(135deg, #0f0a1e 0%, #1a0533 50%, #0a1628 100%)' }}>
-      <AnimatedBackground />
+    <div id="theme-root" className="flex min-h-screen flex-col bg-background text-foreground">
       <AppHeader />
       {state.error && (
         <ErrorBanner message={state.error.message} onRetry={state.error.retryFn} />

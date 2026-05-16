@@ -44,26 +44,33 @@ function renderDashboard(overrides = {}) {
 }
 
 describe('Dashboard', () => {
-  it('shows the total score', () => {
+  it('shows the total score in the score hero', () => {
     renderDashboard()
-    expect(screen.getByText(/3\s*\/\s*4/)).toBeInTheDocument()
+    // Score fraction: "3" (large display) and "/ 4" in the hero panel
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText(/\/\s*4/)).toBeInTheDocument()
   })
 
-  it('shows per-topic score cards', () => {
+  it('shows the by-topic section header', () => {
+    renderDashboard()
+    expect(screen.getByText(/by topic/i)).toBeInTheDocument()
+  })
+
+  it('shows per-topic entries', () => {
     renderDashboard()
     expect(screen.getByText('Algebra')).toBeInTheDocument()
     expect(screen.getByText('Vedic Maths')).toBeInTheDocument()
   })
 
-  it('shows per-question feedback', () => {
+  it('shows per-question feedback in the review list', () => {
     renderDashboard()
     expect(screen.getByText('Great work!')).toBeInTheDocument()
   })
 
   it('shows student vs correct answer when not full marks', () => {
     renderDashboard()
-    expect(screen.getByText(/your answer:/i)).toBeInTheDocument()
-    expect(screen.getByText(/correct answer:/i)).toBeInTheDocument()
+    expect(screen.getByText(/your answer/i)).toBeInTheDocument()
+    expect(screen.getByText(/correct answer/i)).toBeInTheDocument()
     expect(screen.getByText(/221 \(with vedic working shown\)/i)).toBeInTheDocument()
   })
 
@@ -72,41 +79,34 @@ describe('Dashboard', () => {
       ...EVALUATION_RESULT,
       results: [
         EVALUATION_RESULT.results[0],
-        {
-          questionId: 'q2',
-          marks: 0,
-          feedback: 'Not quite.',
-          correctAnswer: '96 cookies',
-        },
+        { questionId: 'q2', marks: 0, feedback: 'Not quite.', correctAnswer: '96 cookies' },
       ],
     }
     renderDashboard({
       evaluationResult: evalPartial,
-      answers: {
-        q2: { questionId: 'q2', mode: 'text', content: '90 cookies' },
-      },
+      answers: { q2: { questionId: 'q2', mode: 'text', content: '90 cookies' } },
     })
     expect(screen.getByText(/90 cookies/)).toBeInTheDocument()
     expect(screen.getByText(/96 cookies/)).toBeInTheDocument()
   })
 
-  it('calls resetSession when Try Again is clicked', async () => {
+  it('renders the "Start a new set" button', () => {
+    renderDashboard()
+    expect(screen.getByRole('button', { name: /start a new set/i })).toBeInTheDocument()
+  })
+
+  it('calls resetSession when "Start a new set" is clicked', async () => {
     const user = userEvent.setup()
     const resetSpy = vi.fn()
-    const ctx = {
-      state: {
-        evaluationResult: EVALUATION_RESULT,
-        questions: [],
-        answers: {},
-      },
-      resetSession: resetSpy,
-    }
     render(
-      <SessionContext.Provider value={ctx}>
+      <SessionContext.Provider value={{
+        state: { evaluationResult: EVALUATION_RESULT, questions: [], answers: {} },
+        resetSession: resetSpy,
+      }}>
         <Dashboard />
       </SessionContext.Provider>
     )
-    await user.click(screen.getByRole('button', { name: /try again/i }))
+    await user.click(screen.getByRole('button', { name: /start a new set/i }))
     expect(resetSpy).toHaveBeenCalledOnce()
   })
 })

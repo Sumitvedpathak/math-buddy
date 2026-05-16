@@ -1,51 +1,52 @@
-/** @type {import('./themes/dandysWorld').Theme} */
-
 /**
- * Dandy's World-inspired theme tokens — dark vibrant edition.
- * Deep purples, electric blues, bright yellows, and neon greens for an
- * exciting, engaging feel aimed at 9–12 year old kids.
- * All values are CSS custom property name → value pairs.
- *
- * @type {Object}
- * @property {string} id
- * @property {string} displayName
- * @property {Record<string, string>} cssVars
- * @property {string} characterAsset - path to character SVG asset
- * @property {string} bgTileAsset - path to background tile SVG asset
+ * EduSpark dark theme tokens.
+ * CSS custom property name → value pairs applied to #theme-root by setTheme().
+ * The same tokens are defined on :root in index.css; inline styles here
+ * override :root, enabling runtime theme switching without a page reload.
  */
 export const theme = {
-  id: 'dandys-world',
-  displayName: "Dandy's World",
-  characterAsset: new URL('../assets/character.svg', import.meta.url).href,
-  bgTileAsset: new URL('../assets/bg-tile.svg', import.meta.url).href,
+  id: 'eduspark-dark',
+  displayName: 'EduSpark Dark',
   cssVars: {
-    '--color-primary': '#facc15',
-    '--color-primary-dark': '#eab308',
-    '--color-secondary': '#38bdf8',
-    '--color-accent': '#a78bfa',
-    '--color-accent-green': '#4ade80',
-    '--color-background': '#0f0a1e',
-    '--color-surface': '#1a1035',
-    '--color-surface-raised': '#241848',
-    '--color-text-primary': '#f0e6ff',
-    '--color-text-secondary': '#a89ec4',
-    '--color-success': '#4ade80',
-    '--color-warning': '#facc15',
-    '--color-error': '#f87171',
-    '--color-canvas-stroke': '#1e1b14',
-    '--font-heading': '"Nunito", "Comic Sans MS", cursive',
-    '--font-body': '"Nunito", "Segoe UI", sans-serif',
-    '--radius-card': '1rem',
-    '--radius-button': '0.75rem',
+    '--radius': '0.875rem',
+    '--background': 'oklch(0.13 0.02 270)',
+    '--foreground': 'oklch(0.97 0.01 90)',
+    '--ink': 'oklch(0.98 0.008 90)',
+    '--ink-soft': 'oklch(0.74 0.02 270)',
+    '--surface': 'oklch(0.17 0.025 270)',
+    '--surface-elevated': 'oklch(0.21 0.03 275)',
+    '--card': 'oklch(0.17 0.025 270)',
+    '--card-foreground': 'oklch(0.97 0.01 90)',
+    '--primary': 'oklch(0.7 0.24 295)',
+    '--primary-foreground': 'oklch(0.13 0.02 270)',
+    '--secondary': 'oklch(0.24 0.04 280)',
+    '--secondary-foreground': 'oklch(0.97 0.01 90)',
+    '--muted': 'oklch(0.22 0.025 275)',
+    '--muted-foreground': 'oklch(0.68 0.02 275)',
+    '--accent': 'oklch(0.88 0.22 130)',
+    '--accent-foreground': 'oklch(0.16 0.04 270)',
+    '--destructive': 'oklch(0.68 0.24 18)',
+    '--destructive-foreground': 'oklch(0.98 0.01 90)',
+    '--success': 'oklch(0.82 0.2 155)',
+    '--success-foreground': 'oklch(0.13 0.02 270)',
+    '--border': 'oklch(1 0 0 / 9%)',
+    '--input': 'oklch(1 0 0 / 12%)',
+    '--ring': 'oklch(0.7 0.24 295)',
+    '--font-display': '"Space Grotesk", ui-sans-serif, system-ui, sans-serif',
+    '--font-sans': '"Inter", ui-sans-serif, system-ui, sans-serif',
+    '--font-mono': '"JetBrains Mono", ui-monospace, monospace',
+    '--gradient-primary': 'linear-gradient(135deg, oklch(0.7 0.24 295), oklch(0.7 0.22 330))',
+    '--gradient-accent': 'linear-gradient(135deg, oklch(0.88 0.22 130), oklch(0.82 0.2 175))',
+    '--glow-primary': '0 0 0 1px oklch(0.7 0.24 295 / 0.4), 0 8px 32px -8px oklch(0.7 0.24 295 / 0.55)',
+    '--glow-accent': '0 0 0 1px oklch(0.88 0.22 130 / 0.5), 0 10px 40px -10px oklch(0.88 0.22 130 / 0.6)',
   },
 }
 
 /**
- * Apply a theme to the root wrapper element by writing CSS custom properties.
- * Does NOT cause a page reload.
+ * Apply a theme to #theme-root by writing CSS custom properties as inline styles.
+ * Overrides :root values without a page reload (CSS inline specificity wins).
  *
- * @param {typeof theme} themeObj - theme object with cssVars record
- * @returns {void}
+ * @param {typeof theme} themeObj
  */
 export function setTheme(themeObj) {
   const root = document.getElementById('theme-root')

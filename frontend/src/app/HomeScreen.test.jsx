@@ -1,28 +1,51 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import HomeScreen from './HomeScreen'
-import { SessionProvider } from '../context/SessionContext'
+import { SessionContext } from '../context/SessionContext'
 
-// Wrap in provider so useSession works
-function renderWithProvider(ui) {
-  return render(<SessionProvider>{ui}</SessionProvider>)
+const mockCtx = {
+  state: { screen: 'home' },
+  navigateTo: vi.fn(),
+}
+
+function renderHome(ctx = mockCtx) {
+  return render(
+    <SessionContext.Provider value={ctx}>
+      <HomeScreen />
+    </SessionContext.Provider>
+  )
 }
 
 describe('HomeScreen', () => {
-  it('has Start Practice button disabled when no topic is selected', () => {
-    renderWithProvider(<HomeScreen />)
-    const btn = screen.getByRole('button', { name: /start practice/i })
-    expect(btn).toBeDisabled()
+  it('renders the hero headline', () => {
+    renderHome()
+    expect(screen.getByText(/maths that hits/i)).toBeInTheDocument()
   })
 
-  it('enables Start Practice when at least one topic is selected', () => {
-    renderWithProvider(<HomeScreen />)
-    // Click the first topic button
-    const topicButtons = screen.getAllByRole('button').filter(
-      (b) => !b.textContent.match(/start practice/i) && !b.textContent.match(/age/i)
-    )
-    fireEvent.click(topicButtons[0])
-    const btn = screen.getByRole('button', { name: /start practice/i })
-    expect(btn).not.toBeDisabled()
+  it('renders the "Start a practice set" hero CTA button', () => {
+    renderHome()
+    expect(screen.getByRole('button', { name: /start a practice set/i })).toBeInTheDocument()
+  })
+
+  it('renders the four topic track cards', () => {
+    renderHome()
+    // Track cards use h3 headings — use exact heading text to avoid matching hero body copy
+    expect(screen.getByRole('heading', { name: 'Vedic Maths' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Word Problems' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Algebra' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Volumes & Shapes' })).toBeInTheDocument()
+  })
+
+  it('renders the three How It Works numbered steps', () => {
+    renderHome()
+    // Step titles are unique headings in the How It Works section
+    expect(screen.getByRole('heading', { name: /configure your set/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /solve your way/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /review, then refine/i })).toBeInTheDocument()
+  })
+
+  it('renders the CTA banner "Begin practising" button', () => {
+    renderHome()
+    expect(screen.getByRole('button', { name: /begin practising/i })).toBeInTheDocument()
   })
 })
