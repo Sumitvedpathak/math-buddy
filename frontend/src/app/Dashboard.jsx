@@ -3,11 +3,28 @@ import ScoreCard from '../components/ScoreCard'
 import FractionText from '../components/FractionText'
 
 /**
+ * Best-effort label for what the student submitted when marks < 2.
+ * @param {{ studentAnswer?: string, marks: number }} result
+ * @param {{ mode: string, content: string }|null|undefined} submitted
+ */
+function getStudentAnswerLine(result, submitted) {
+  const fromLlm = result.studentAnswer?.trim()
+  if (fromLlm) return fromLlm
+  if (!submitted?.content?.trim()) return null
+  if (submitted.mode === 'text') {
+    const t = submitted.content.trim()
+    return t.length > 220 ? `${t.slice(0, 220)}…` : t
+  }
+  return null
+}
+
+/**
  * Dashboard — shows evaluation results: total score, topic breakdown, per-question feedback.
  */
 export default function Dashboard() {
   const { state, resetSession } = useSession()
-  const { evaluationResult, questions } = state
+  const { evaluationResult, questions, answers: answersRaw } = state
+  const answers = answersRaw ?? {}
 
   if (!evaluationResult) {
     return (
@@ -59,6 +76,9 @@ export default function Dashboard() {
           <ol className="space-y-3 list-none p-0">
             {results.map((r, i) => {
               const q = questionMap[r.questionId]
+              const submitted = answers[r.questionId]
+              const studentLine = r.marks < 2 ? getStudentAnswerLine(r, submitted) : null
+              const showAnswers = r.marks < 2 && (studentLine || r.correctAnswer)
               return (
                 <li key={r.questionId} className="rounded-card bg-surface p-4 shadow-sm space-y-1">
                   <div className="flex items-start justify-between gap-3">
@@ -79,6 +99,33 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <p className="font-body text-sm text-text-secondary">{r.feedback}</p>
+                  {showAnswers && (
+                    <div
+                      className="mt-3 space-y-2 rounded-lg border px-3 py-2.5"
+                      style={{
+                        borderColor: 'rgba(167,139,250,0.25)',
+                        background: 'rgba(15,10,30,0.45)',
+                      }}
+                    >
+                      {studentLine && (
+                        <p className="font-body text-sm leading-snug" style={{ color: '#fecaca' }}>
+                          <span className="font-bold text-red-200">Your answer: </span>
+                          <FractionText text={studentLine} fontSize="0.95em" />
+                        </p>
+                      )}
+                      {!studentLine && submitted?.mode === 'sketch' && r.marks < 2 && r.correctAnswer && (
+                        <p className="font-body text-xs italic" style={{ color: '#a89ec4' }}>
+                          Your answer was a sketch — compare with the correct answer below.
+                        </p>
+                      )}
+                      {r.correctAnswer && (
+                        <p className="font-body text-sm leading-snug" style={{ color: '#bbf7d0' }}>
+                          <span className="font-bold text-green-200">Correct answer: </span>
+                          <FractionText text={r.correctAnswer} fontSize="0.95em" />
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </li>
               )
             })}

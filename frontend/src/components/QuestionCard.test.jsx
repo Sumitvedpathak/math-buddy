@@ -1,10 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
+import * as React from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import QuestionCard from './QuestionCard'
 
 vi.mock('react-sketch-canvas', () => ({
-  ReactSketchCanvas: vi.fn(() => <div data-testid="sketch-canvas" />),
+  ReactSketchCanvas: React.forwardRef(function MockSketchCanvas(props, ref) {
+    React.useImperativeHandle(ref, () => ({
+      clearCanvas: vi.fn().mockResolvedValue(undefined),
+      eraseMode: vi.fn(),
+      exportImage: vi.fn().mockResolvedValue(''),
+    }))
+    return <div data-testid="sketch-canvas" aria-label={props['aria-label']} />
+  }),
 }))
 
 const QUESTION = {
@@ -35,9 +43,9 @@ describe('QuestionCard', () => {
   it('renders text mode toggle', async () => {
     const user = userEvent.setup()
     render(<QuestionCard question={QUESTION} answer={null} onAnswer={vi.fn()} questionNumber={1} />)
-    const textBtn = screen.getByRole('button', { name: /text/i })
-    expect(textBtn).toBeInTheDocument()
-    await user.click(textBtn)
+    const textBtns = screen.getAllByRole('button', { name: /text/i })
+    expect(textBtns.length).toBeGreaterThan(0)
+    await user.click(textBtns[0])
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 })

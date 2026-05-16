@@ -1,4 +1,5 @@
-from typing import Literal
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
 
 from app.schemas.questions import QuestionSchema
@@ -21,6 +22,14 @@ class QuestionResultSchema(BaseModel):
     question_id: str
     marks: Literal[0, 1, 2]
     feedback: str
+    student_answer: Optional[str] = Field(
+        default=None,
+        description="What the student answered (required from LLM when marks < 2).",
+    )
+    correct_answer: Optional[str] = Field(
+        default=None,
+        description="Expected correct answer (required from LLM when marks < 2).",
+    )
 
 
 class TopicScoreSchema(BaseModel):

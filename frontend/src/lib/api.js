@@ -16,7 +16,7 @@
 
 /**
  * @typedef {Object} EvaluationResult
- * @property {Array<{questionId: string, marks: 0|1|2, feedback: string}>} results
+ * @property {Array<{questionId: string, marks: 0|1|2, feedback: string, studentAnswer?: string, correctAnswer?: string}>} results
  * @property {number} totalScore
  * @property {number} maxScore
  * @property {Record<string, {score: number, maxScore: number, questionCount: number}>} topicBreakdown
@@ -90,6 +90,8 @@ export async function evaluateAnswers(questions, answers) {
       questionId: r.question_id,
       marks: r.marks,
       feedback: r.feedback,
+      studentAnswer: r.student_answer ?? undefined,
+      correctAnswer: r.correct_answer ?? undefined,
     })),
     totalScore: raw.total_score,
     maxScore: raw.max_score,

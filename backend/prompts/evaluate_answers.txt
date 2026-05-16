@@ -39,6 +39,12 @@ When reading handwritten sketches: interpret crossed-out numbers, arrows, and wo
 
 Provide a short, encouraging feedback sentence per question (1-2 sentences, child-friendly tone).
 
+When **`marks` is less than 2** (student did not get full credit), you MUST also include:
+- **`student_answer`**: A concise phrase stating what the student actually answered or concluded (e.g. wrong number, incomplete sentence). For sketches, infer their written final answer if readable; if unreadable, say something like `"Unclear or incomplete sketch"`.
+- **`correct_answer`**: The correct answer or completion they should have given (one short phrase or sentence, include units if the question asks for them).
+
+When **`marks` is 2**, omit `student_answer` and `correct_answer` entirely (or set them to null).
+
 ## Output format
 
 Respond with ONLY a valid JSON object (no markdown fences) exactly matching this schema:
@@ -49,7 +55,9 @@ Respond with ONLY a valid JSON object (no markdown fences) exactly matching this
     {
       "question_id": "<UUID string>",
       "marks": <0|1|2>,
-      "feedback": "<1-2 sentences>"
+      "feedback": "<1-2 sentences>",
+      "student_answer": "<optional: required when marks < 2>",
+      "correct_answer": "<optional: required when marks < 2>"
     }
   ]
 }
