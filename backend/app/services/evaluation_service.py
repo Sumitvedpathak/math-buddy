@@ -10,7 +10,8 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 from pydantic import ValidationError
 
-from app.integrations.openrouter import call_llm, LLMServiceError
+# from app.integrations.openrouter import call_llm, LLMServiceError
+from app.integrations.langchainrouter import call_llm, LLMServiceError
 from app.schemas.evaluation import (
     EvaluateAnswersRequest,
     EvaluateAnswersResponse,

@@ -5,7 +5,8 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from pydantic import ValidationError
 
-from app.integrations.openrouter import call_llm, LLMServiceError
+# from app.integrations.openrouter import call_llm, LLMServiceError
+from app.integrations.langchainrouter import call_llm, LLMServiceError
 from app.schemas.questions import GenerateQuestionsRequest, GenerateQuestionsResponse
 
 logger = logging.getLogger(__name__)

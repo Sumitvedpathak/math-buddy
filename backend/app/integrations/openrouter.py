@@ -29,7 +29,7 @@ def _get_client() -> AsyncOpenAI:
     if _client is None:
         settings = get_settings()
         _client = AsyncOpenAI(
-            api_key=settings.openrouter_api_key,
+            api_key=settings.math_buddy_openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
             timeout=30.0,
         )
@@ -52,7 +52,7 @@ async def call_llm(prompt: str, images: list[str] | None = None) -> dict:
         LLMServiceError: On API error, timeout, connection failure, or JSON parse failure.
     """
     settings = get_settings()
-    model = settings.openrouter_model
+    model = settings.math_buddy_openrouter_model
     client = _get_client()
 
     # Build message content — multimodal if images provided
