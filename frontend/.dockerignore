@@ -1,0 +1,10 @@
+# Installed/built inside the image (see Dockerfile.prod); the local copies are Windows builds
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+test_output.txt
+test_results.txt
+# NOTE: public/lessons (textbook page images) must stay IN the build context.
