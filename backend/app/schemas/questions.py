@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 import uuid
 
 ProblemType = Literal[
-    "multiplication", "division", "fractions", "mixed_fractions", "squares"
+    "multiplication", "division", "fractions", "mixed_fractions", "squares", "lesson"
 ]
 
 AgeGroup = Literal["9-10", "11-12"]
@@ -13,6 +13,9 @@ class GenerateQuestionsRequest(BaseModel):
     topics: list[str] = Field(..., min_length=1)
     age_group: AgeGroup
     question_count: Annotated[int, Field(default=30, ge=1, le=100)] = 30
+    # Curriculum lesson (e.g. "10.3"): scopes generation to that lesson and
+    # replaces the five mandatory arithmetic problem types with "lesson".
+    lesson_id: str | None = None
 
 
 class QuestionSchema(BaseModel):

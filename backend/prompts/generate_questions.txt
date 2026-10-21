@@ -4,12 +4,20 @@ SESSION PARAMETERS:
 - Topics selected: {{ topics | join(", ") }}
 - Age group: {{ age_group }}
 - Total questions: {{ question_count }}
-
+{% if lesson %}
+LESSON FOCUS (Grade 7 curriculum, Unit {{ lesson.unit_number }}: {{ lesson.unit_title }}):
+- Lesson {{ lesson.id }}: {{ lesson.title }}
+- Learning goal: {{ lesson.focus }}
+- Key vocabulary: {{ lesson.keywords | join(", ") }}
+Every question MUST practise this specific lesson and nothing else. Target Grade 7 level; this overrides the age-group calibration below. Mix short computational questions with a few word problems, and make the questions progressively harder.
+{% endif %}
 CURRICULUM CALIBRATION:
 - Age group "9-10" → Grade 3–4 level (e.g., multiplication tables, basic fractions, simple word problems, volumes of simple shapes)
 - Age group "11-12" → Grade 5–6 level (e.g., multi-step problems, mixed fractions, algebraic expressions, compound volumes)
 
-MANDATORY PROBLEM TYPES:
+{% if lesson %}PROBLEM TYPE:
+Set problem_type to exactly "lesson" for every question. Do NOT use the generic arithmetic problem types.
+{% else %}MANDATORY PROBLEM TYPES:
 Every session MUST include questions of ALL FIVE of these problem_type values, regardless of the topics selected:
 - "multiplication"
 - "division"
@@ -18,6 +26,7 @@ Every session MUST include questions of ALL FIVE of these problem_type values, r
 - "squares"
 
 Distribute these five types as evenly as possible across the {{ question_count }} questions. If {{ question_count }} is not divisible by 5, distribute the remainder one extra question each to the first ({{ question_count }} mod 5) types in the order listed above. Remaining question slots after mandatory type distribution should align with the selected topics.
+{% endif %}
 
 DIFFICULTY ORDERING:
 Assign each question an integer difficulty_tier starting at 1. Questions MUST be ordered ascending by difficulty_tier — the first question should be the easiest and the last the hardest. The difficulty_tier values must reflect genuine grade-level complexity: simpler operations, smaller numbers, and fewer steps for lower tiers.
@@ -75,7 +84,7 @@ Return ONLY valid JSON. No preamble, no markdown code fences, no explanation. Re
     {
       "id": "<uuid-v4>",
       "topic": "<one of the selected topics>",
-      "problem_type": "<one of the five mandatory types>",
+      "problem_type": "{% if lesson %}lesson{% else %}<one of the five mandatory types>{% endif %}",
       "text": "<the question as shown to the student>",
       "difficulty_tier": <integer starting at 1>
     }

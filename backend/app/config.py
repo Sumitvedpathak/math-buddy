@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     langsmith_api_key: str | None = Field(default=None, validation_alias="math_buddy_langsmith_api_key")
 
+    # Postgres, e.g. postgresql+asyncpg://user:pass@host:5432/dbname.
+    # Optional so the LLM-only endpoints still run without a database.
+    database_url: str | None = Field(default=None, validation_alias="math_buddy_database_url")
+    # Fixed secret for /api/v1/admin/*. Unset = admin API always returns 404.
+    admin_token: str | None = Field(default=None, validation_alias="math_buddy_admin_token")
+
     # Logging
     # log_level: DEBUG | INFO | WARNING | ERROR | CRITICAL
     log_level: str = "INFO"

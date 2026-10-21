@@ -5,7 +5,7 @@
 
 ## 1. Goal
 
-Turn the 8 extracted curriculum units (40 lessons, from `resources/*.pdf`) into a
+Turn the 8 extracted curriculum units (46 lessons, from `resources/*.pdf`) into a
 structured, trackable study path inside Math Buddy, alongside the existing
 ad-hoc topic practice. A grade 7 student should be able to pick any
 unit/lesson, practice it, and have the app remember whether he's mastered it
@@ -121,7 +121,7 @@ GET  /api/v1/profiles/{id}/lesson-status current status per lesson only:
 GET /api/v1/admin/profiles                       list of children
 GET /api/v1/admin/profiles/{id}/attempts          full attempt history, all timestamps
 GET /api/v1/admin/profiles/{id}/progress/daily    attempts grouped by calendar day
-GET /api/v1/admin/profiles/{id}/lesson-progress   full per-lesson detail, all 40 lessons
+GET /api/v1/admin/profiles/{id}/lesson-progress   full per-lesson detail, all 46 lessons
 ```
 
 The admin frontend route is `/admin/<token>` — a permanent, randomly
@@ -220,7 +220,7 @@ evaluating screen are unchanged. After evaluation:
 **Admin page** (`/admin/<token>`) — entirely separate route tree, not linked
 from anywhere a child would navigate. Profile list → select a child → daily
 progress calendar (via `/progress/daily`), full attempt history table,
-per-lesson mastery grid across all 40 lessons.
+per-lesson mastery grid across all 46 lessons.
 
 ## 7. Error handling
 
