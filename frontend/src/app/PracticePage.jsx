@@ -15,7 +15,7 @@ const QUICK_COUNTS = [5, 10, 20, 30]
 export default function PracticePage() {
   const {
     state,
-    setAgeGroup, toggleTopic, setQuestionCount, startSession, startLesson,
+    setAgeGroup, toggleTopic, setQuestionCount, startSession, openLesson,
     setAnswer, submitAnswers,
   } = useSession()
   const {
@@ -60,7 +60,7 @@ export default function PracticePage() {
       profile={profile}
       curriculum={curriculum ?? []}
       lessonStatus={lessonStatus ?? {}}
-      onPracticeLesson={startLesson}
+      onPracticeLesson={openLesson}
     />
   }
 
