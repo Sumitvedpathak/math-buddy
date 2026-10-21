@@ -1,0 +1,586 @@
+{
+  "units": [
+    {
+      "id": "unit-02",
+      "number": 2,
+      "title": "Ratio and Rate",
+      "grade": "7",
+      "keywords": [
+        "ratio",
+        "part-to-whole ratio",
+        "part-to-part ratio",
+        "terms of a ratio",
+        "equivalent ratios",
+        "simplest form",
+        "rate",
+        "unit rate",
+        "average speed"
+      ],
+      "lessons": [
+        {
+          "id": "2.1",
+          "title": "What Is a Ratio?",
+          "keywords": [
+            "ratio",
+            "part-to-whole ratio",
+            "part-to-part ratio",
+            "terms of a ratio"
+          ],
+          "focus": "Use models and diagrams to investigate ratios."
+        },
+        {
+          "id": "2.2",
+          "title": "Equivalent Ratios",
+          "keywords": [
+            "equivalent ratios",
+            "simplest form"
+          ],
+          "focus": "Write equivalent ratios."
+        },
+        {
+          "id": "2.3",
+          "title": "Comparing Ratios",
+          "keywords": [
+            "equivalent ratios",
+            "comparing ratios"
+          ],
+          "focus": "Use equivalent ratios to compare ratios."
+        },
+        {
+          "id": "2.4",
+          "title": "Applications of Ratios",
+          "keywords": [
+            "ratio",
+            "scale",
+            "proportion"
+          ],
+          "focus": "Use ratios to solve problems."
+        },
+        {
+          "id": "2.5",
+          "title": "What Is a Rate?",
+          "keywords": [
+            "rate",
+            "unit rate",
+            "average speed"
+          ],
+          "focus": "Investigate rates."
+        }
+      ]
+    },
+    {
+      "id": "unit-03",
+      "number": 3,
+      "title": "Geometry and Measurement (Prisms)",
+      "grade": "7",
+      "keywords": [
+        "polyhedron"
+      ],
+      "lessons": [
+        {
+          "id": "3.1",
+          "title": "Sketching Views of Solids",
+          "keywords": [
+            "front view",
+            "side view",
+            "top view",
+            "linking cubes"
+          ],
+          "focus": "Recognize and sketch different views of objects."
+        },
+        {
+          "id": "3.2",
+          "title": "Sketching Solids",
+          "keywords": [
+            "polyhedron",
+            "isometric drawing",
+            "faces",
+            "edges",
+            "vertices"
+          ],
+          "focus": "Sketch pictures of objects from models and drawings."
+        },
+        {
+          "id": "3.3",
+          "title": "Building Objects from Nets",
+          "keywords": [
+            "net",
+            "prism",
+            "pyramid"
+          ],
+          "focus": "Build objects from nets."
+        },
+        {
+          "id": "3.4",
+          "title": "Using Variables in Measurement Formulas",
+          "keywords": [
+            "variable",
+            "formula",
+            "perimeter",
+            "area"
+          ],
+          "focus": "Use measurement formulas to introduce the concept of a variable."
+        },
+        {
+          "id": "3.5",
+          "title": "Surface Area of a Rectangular Prism",
+          "keywords": [
+            "surface area",
+            "rectangular prism",
+            "net"
+          ],
+          "focus": "Use a formula to calculate the surface area of a rectangular prism."
+        },
+        {
+          "id": "3.6",
+          "title": "Volume of a Rectangular Prism",
+          "keywords": [
+            "volume",
+            "rectangular prism",
+            "cubic units"
+          ],
+          "focus": "Use a formula to calculate the volume of a rectangular prism."
+        }
+      ]
+    },
+    {
+      "id": "unit-04",
+      "number": 4,
+      "title": "Fractions and Decimals",
+      "grade": "7",
+      "keywords": [
+        "fraction strips",
+        "equivalent fractions"
+      ],
+      "lessons": [
+        {
+          "id": "4.1",
+          "title": "Combining Fractions",
+          "keywords": [
+            "equivalent fractions",
+            "fraction strips"
+          ],
+          "focus": "Find equivalent fractions and add fractions."
+        },
+        {
+          "id": "4.2",
+          "title": "Adding Fractions Using Models",
+          "keywords": [
+            "adding fractions",
+            "fraction strips",
+            "fraction circles"
+          ],
+          "focus": "Add fractions using circles or fraction strips."
+        },
+        {
+          "id": "4.3",
+          "title": "Adding Fractions",
+          "keywords": [
+            "common denominator",
+            "adding fractions",
+            "mixed numbers"
+          ],
+          "focus": "Add fractions using symbols."
+        },
+        {
+          "id": "4.4",
+          "title": "Subtracting Fractions Using Models",
+          "keywords": [
+            "subtracting fractions",
+            "fraction strips",
+            "number line"
+          ],
+          "focus": "Subtract fractions using fraction strips and number lines."
+        },
+        {
+          "id": "4.5",
+          "title": "Subtracting Fractions",
+          "keywords": [
+            "common denominator",
+            "subtracting fractions",
+            "mixed numbers"
+          ],
+          "focus": "Subtract fractions using symbols."
+        },
+        {
+          "id": "4.6",
+          "title": "Exploring Repeated Addition",
+          "keywords": [
+            "repeated addition",
+            "multiplying a fraction by a whole number"
+          ],
+          "focus": "Multiply a fraction by a whole number."
+        },
+        {
+          "id": "4.7",
+          "title": "Multiplying Decimals",
+          "keywords": [
+            "multiplying decimals",
+            "tenths",
+            "estimation"
+          ],
+          "focus": "Multiply decimals with tenths."
+        },
+        {
+          "id": "4.8",
+          "title": "Dividing Decimals",
+          "keywords": [
+            "dividing decimals",
+            "tenths",
+            "estimation"
+          ],
+          "focus": "Divide decimals with tenths."
+        },
+        {
+          "id": "4.9",
+          "title": "Order of Operations with Decimals",
+          "keywords": [
+            "order of operations",
+            "BEDMAS",
+            "decimals"
+          ],
+          "focus": "Use the order of operations to evaluate expressions."
+        }
+      ]
+    },
+    {
+      "id": "unit-05",
+      "number": 5,
+      "title": "Data Management",
+      "grade": "7",
+      "keywords": [
+        "mean",
+        "median",
+        "mode",
+        "primary data",
+        "secondary data",
+        "biased",
+        "database",
+        "fields",
+        "Statistics Canada"
+      ],
+      "lessons": [
+        {
+          "id": "5.1",
+          "title": "Collecting Data",
+          "keywords": [
+            "primary data",
+            "secondary data",
+            "biased",
+            "database",
+            "fields"
+          ],
+          "focus": "Analyse data collection and possible bias."
+        },
+        {
+          "id": "5.2",
+          "title": "Recording Data",
+          "keywords": [
+            "table",
+            "bar graph",
+            "pictograph"
+          ],
+          "focus": "Record data in tables, bar graphs, and pictographs."
+        },
+        {
+          "id": "5.3",
+          "title": "Stem-and-Leaf Plots",
+          "keywords": [
+            "stem-and-leaf plot",
+            "mean",
+            "median",
+            "mode",
+            "range"
+          ],
+          "focus": "Display data using stem-and-leaf plots and find the mean, median, and mode."
+        },
+        {
+          "id": "5.4",
+          "title": "Line Graphs",
+          "keywords": [
+            "line graph",
+            "trend"
+          ],
+          "focus": "Display data using line graphs and describe trends."
+        },
+        {
+          "id": "5.5",
+          "title": "Applications of Mean, Median, and Mode",
+          "keywords": [
+            "mean",
+            "median",
+            "mode",
+            "measures of central tendency"
+          ],
+          "focus": "Understand which measure of central tendency best describes a set of data."
+        },
+        {
+          "id": "5.6",
+          "title": "Evaluating Data Analysis",
+          "keywords": [
+            "misleading graphs",
+            "bias"
+          ],
+          "focus": "Examine how data can be misleading."
+        }
+      ]
+    },
+    {
+      "id": "unit-06",
+      "number": 6,
+      "title": "Measuring Perimeter and Area",
+      "grade": "7",
+      "keywords": [
+        "perimeter",
+        "area",
+        "parallelogram",
+        "triangle",
+        "trapezoid"
+      ],
+      "lessons": [
+        {
+          "id": "6.1",
+          "title": "Area of a Parallelogram",
+          "keywords": [
+            "parallelogram",
+            "base",
+            "height",
+            "area"
+          ],
+          "focus": "Use a formula to find the area of a parallelogram."
+        },
+        {
+          "id": "6.2",
+          "title": "Area of a Triangle",
+          "keywords": [
+            "triangle",
+            "base",
+            "height",
+            "area"
+          ],
+          "focus": "Use a formula to find the area of a triangle."
+        },
+        {
+          "id": "6.3",
+          "title": "Area and Perimeter of a Trapezoid",
+          "keywords": [
+            "trapezoid",
+            "area",
+            "perimeter"
+          ],
+          "focus": "Use a formula to find the area of a trapezoid."
+        },
+        {
+          "id": "6.4",
+          "title": "Measuring Irregular Figures",
+          "keywords": [
+            "irregular figure",
+            "area",
+            "perimeter"
+          ],
+          "focus": "Find the area and perimeter of an irregular figure."
+        }
+      ]
+    },
+    {
+      "id": "unit-07",
+      "number": 7,
+      "title": "Geometry (Transformations)",
+      "grade": "7",
+      "keywords": [
+        "convex polygon",
+        "concave polygon",
+        "tiling the plane",
+        "tessellations"
+      ],
+      "lessons": [
+        {
+          "id": "7.1",
+          "title": "Classifying Figures",
+          "keywords": [
+            "convex polygon",
+            "concave polygon",
+            "regular polygon"
+          ],
+          "focus": "Identify, describe, and classify geometric figures."
+        },
+        {
+          "id": "7.2",
+          "title": "Congruent Figures",
+          "keywords": [
+            "congruent figures",
+            "corresponding sides",
+            "corresponding angles"
+          ],
+          "focus": "Identify the conditions for congruence."
+        },
+        {
+          "id": "7.3",
+          "title": "Transformations",
+          "keywords": [
+            "translation",
+            "reflection",
+            "rotation",
+            "transformation image"
+          ],
+          "focus": "Recognize transformation images."
+        },
+        {
+          "id": "7.4",
+          "title": "Tiling Patterns",
+          "keywords": [
+            "tiling the plane",
+            "tessellations"
+          ],
+          "focus": "Construct and analyse tiling patterns."
+        },
+        {
+          "id": "7.5",
+          "title": "Using Transformations to Make Designs",
+          "keywords": [
+            "tessellations",
+            "translation",
+            "reflection",
+            "rotation"
+          ],
+          "focus": "Create and analyse designs using transformations."
+        }
+      ]
+    },
+    {
+      "id": "unit-08",
+      "number": 8,
+      "title": "Working with Percents",
+      "grade": "7",
+      "keywords": [
+        "percent",
+        "percent circle"
+      ],
+      "lessons": [
+        {
+          "id": "8.1",
+          "title": "Relating Fractions, Decimals, and Percents",
+          "keywords": [
+            "percent",
+            "fraction",
+            "decimal"
+          ],
+          "focus": "Relate percent to fractions and decimals."
+        },
+        {
+          "id": "8.2",
+          "title": "Estimating and Calculating Percents",
+          "keywords": [
+            "percent",
+            "estimation",
+            "mental math"
+          ],
+          "focus": "Use mental math and estimation."
+        },
+        {
+          "id": "8.3",
+          "title": "Multiplying to Find Percents",
+          "keywords": [
+            "percent",
+            "percent circle",
+            "hundredths"
+          ],
+          "focus": "Multiply decimals with hundredths."
+        },
+        {
+          "id": "8.4",
+          "title": "Drawing Circle Graphs",
+          "keywords": [
+            "circle graph",
+            "percent circle",
+            "percent"
+          ],
+          "focus": "Use circle graphs to display data and solve problems."
+        },
+        {
+          "id": "8.5",
+          "title": "Dividing to Find Percents",
+          "keywords": [
+            "percent",
+            "dividing decimals",
+            "hundredths"
+          ],
+          "focus": "Divide decimals with hundredths."
+        }
+      ]
+    },
+    {
+      "id": "unit-10",
+      "number": 10,
+      "title": "Patterning and Algebra",
+      "grade": "7",
+      "keywords": [
+        "ordered pairs",
+        "algebraic expression",
+        "evaluate",
+        "equation",
+        "solve an equation"
+      ],
+      "lessons": [
+        {
+          "id": "10.1",
+          "title": "Number Patterns",
+          "keywords": [
+            "number pattern",
+            "pattern rule",
+            "term"
+          ],
+          "focus": "Extend patterns and use them to make predictions."
+        },
+        {
+          "id": "10.2",
+          "title": "Graphing Patterns",
+          "keywords": [
+            "ordered pairs",
+            "table of values",
+            "graph"
+          ],
+          "focus": "Use a table and a graph to describe a pattern."
+        },
+        {
+          "id": "10.3",
+          "title": "Variables in Expressions",
+          "keywords": [
+            "variable",
+            "algebraic expression"
+          ],
+          "focus": "Use a variable to represent a set of numbers."
+        },
+        {
+          "id": "10.4",
+          "title": "Evaluating Algebraic Expressions",
+          "keywords": [
+            "algebraic expression",
+            "evaluate",
+            "substitute"
+          ],
+          "focus": "Substitute a number for a variable in an algebraic expression."
+        },
+        {
+          "id": "10.5",
+          "title": "Reading and Writing Equations",
+          "keywords": [
+            "equation",
+            "variable"
+          ],
+          "focus": "Translate statements into equations."
+        },
+        {
+          "id": "10.6",
+          "title": "Solving Equations",
+          "keywords": [
+            "solve an equation",
+            "inspection",
+            "systematic trial"
+          ],
+          "focus": "Solve equations by inspection and by systematic trial."
+        }
+      ]
+    }
+  ]
+}

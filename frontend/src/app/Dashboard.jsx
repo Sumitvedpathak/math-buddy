@@ -1,6 +1,8 @@
 import { useSession } from '../context/SessionContext'
 import FractionText from '../components/FractionText'
 
+const MASTERY_PCT = 95
+
 function getStudentAnswerLine(result, submitted) {
   const fromLlm = result.studentAnswer?.trim()
   if (fromLlm) return fromLlm
@@ -20,9 +22,12 @@ function contextualMessage(pct) {
 }
 
 export default function Dashboard() {
-  const { state, resetSession } = useSession()
-  const { evaluationResult, questions, answers: answersRaw } = state
+  const { state, resetSession, startLesson } = useSession()
+  const { evaluationResult, questions, answers: answersRaw, lessonId, curriculum, saveStatus } = state
   const answers = answersRaw ?? {}
+  const lesson = lessonId
+    ? (curriculum ?? []).flatMap((u) => u.lessons).find((l) => l.id === lessonId)
+    : null
 
   if (!evaluationResult) {
     return (
@@ -35,6 +40,8 @@ export default function Dashboard() {
   const { results, totalScore, maxScore, topicBreakdown } = evaluationResult
   const questionMap = Object.fromEntries((questions ?? []).map((q) => [q.id, q]))
   const percent = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
+  // Exact comparison (not the rounded percent): 94.6% must not count as mastery.
+  const mastered = maxScore > 0 && totalScore * 100 >= MASTERY_PCT * maxScore
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12 md:py-16 space-y-12">
@@ -89,6 +96,55 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {/* ── Curriculum lesson outcome ── */}
+      {lessonId && (
+        <section
+          aria-label="Lesson result"
+          className={`rounded-2xl p-6 md:p-8 ring-soft ${mastered ? 'bg-success/10' : 'bg-card'}`}
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            / Lesson {lessonId}{lesson ? ` · ${lesson.title}` : ''}
+          </p>
+          {mastered ? (
+            <>
+              <h2 className="mt-2 font-display text-3xl font-semibold text-success">Lesson mastered! ✓</h2>
+              <p className="mt-1 text-ink-soft">You scored {MASTERY_PCT}% or more — this lesson is complete.</p>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Keep practising</h2>
+              <p className="mt-1 text-ink-soft">
+                Score {MASTERY_PCT}% or more to master this lesson. Review the working below, then try a fresh set.
+              </p>
+            </>
+          )}
+          <div className="mt-5 flex flex-wrap gap-3">
+            {!mastered && (
+              <button
+                type="button"
+                onClick={() => startLesson(lessonId)}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                Try again with new questions
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={resetSession}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface-elevated"
+            >
+              Back to lessons
+            </button>
+          </div>
+        </section>
+      )}
+
+      {saveStatus === 'failed' && (
+        <p role="status" className="rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-3 text-sm text-destructive">
+          Your progress may not have saved, but you can keep practising.
+        </p>
+      )}
 
       {/* ── Question review ── */}
       <section>

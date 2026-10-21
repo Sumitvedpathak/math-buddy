@@ -8,6 +8,7 @@ from pydantic import ValidationError
 # from app.integrations.openrouter import call_llm, LLMServiceError
 from app.integrations.langchainrouter import call_llm, LLMServiceError
 from app.schemas.questions import GenerateQuestionsRequest, GenerateQuestionsResponse
+from app.services.curriculum_service import UnknownLessonError, get_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,14 @@ def _validate_vedic(question_text: str) -> bool:
     return bool(_VEDIC_PATTERN.search(question_text))
 
 
-def _validate_response(data: dict) -> GenerateQuestionsResponse:
-    """Parse and validate the LLM response dict. Raises ValueError on failure."""
+def _validate_response(
+    data: dict, require_mandatory: bool = True
+) -> GenerateQuestionsResponse:
+    """Parse and validate the LLM response dict. Raises ValueError on failure.
+
+    Lesson-scoped sessions pass require_mandatory=False: their questions are all
+    problem_type "lesson", not the five generic arithmetic types.
+    """
     try:
         response = GenerateQuestionsResponse.model_validate(data)
     except ValidationError as exc:
@@ -53,7 +60,7 @@ def _validate_response(data: dict) -> GenerateQuestionsResponse:
     present_types = {q.problem_type for q in response.questions}
     missing = MANDATORY_TYPES - present_types
     # Only enforce all 5 types when enough questions were requested to accommodate them
-    if missing and len(response.questions) >= len(MANDATORY_TYPES):
+    if require_mandatory and missing and len(response.questions) >= len(MANDATORY_TYPES):
         logger.warning(
             "LLM response missing mandatory problem types",
             extra={"missing_types": list(missing), "present_types": list(present_types)},
@@ -72,14 +79,22 @@ async def generate_questions(
 
     Raises:
         LLMServiceError: If the LLM call fails on all attempts.
+        UnknownLessonError: If request.lesson_id is not in the curriculum.
         ValueError: If validation consistently fails (should not reach caller normally).
     """
+    lesson = None
+    if request.lesson_id is not None:
+        lesson = get_lesson(request.lesson_id)
+        if lesson is None:
+            raise UnknownLessonError(request.lesson_id)
+
     template = _jinja_env.get_template("generate_questions.txt")
     prompt = template.render(
         topics=request.topics,
         age_group=request.age_group,
         question_count=request.question_count,
         facts_count=FUN_FACTS_COUNT,
+        lesson=lesson,
     )
 
     logger.info(
@@ -101,7 +116,7 @@ async def generate_questions(
                     extra={"attempt": attempt + 1, "max_attempts": MAX_RETRIES + 1},
                 )
             raw = await call_llm(prompt)
-            response = _validate_response(raw)
+            response = _validate_response(raw, require_mandatory=lesson is None)
             # Sort by difficulty_tier ascending
             response.questions.sort(key=lambda q: q.difficulty_tier)
             logger.info(
