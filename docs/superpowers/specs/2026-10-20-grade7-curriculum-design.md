@@ -250,18 +250,44 @@ per-lesson mastery grid across all 40 lessons.
 
 ## 9. Implementation phasing (for the implementation plan)
 
-Suggested order, each phase shippable/testable on its own:
+Two phases: the entire backend first, then the entire frontend. Phase 1 is
+complete (and testable via pytest + `/docs`) before any frontend work starts,
+so Phase 2 builds against a stable, finished API.
 
-1. **Backend foundation** — Postgres schema + migrations, profile
-   lookup/create endpoints, attempt-save endpoint, lesson-status endpoint.
-2. **Curriculum content** — convert the already-extracted unit/lesson data
-   into `curriculum.json`, add the `GET /api/v1/curriculum` endpoint, extend
-   the question-generation prompt template to accept lesson context.
-3. **Frontend integration** — profile entry screen + localStorage caching,
-   grade-gated topic selector, unit/lesson picker with completion badges,
-   fixed-25 curriculum session flow, dashboard mastery messaging.
-4. **Ad-hoc attempt persistence** — smallest change: call
-   `POST /api/v1/attempts` after every evaluation regardless of mode, so the
-   4 existing topics start contributing to history too.
-5. **Admin page** — token generation/storage, admin endpoints, admin
-   frontend route and views.
+### Phase 1 — Backend
+
+1. **Database foundation** — Postgres connection config, schema + migrations
+   for `profiles`, `lesson_progress`, `practice_attempts`.
+2. **Profile endpoints** — `GET /profiles/lookup` (read-only) and
+   `POST /profiles`.
+3. **Curriculum content** — convert the already-extracted unit/lesson data
+   into `backend/app/data/curriculum.json`, load at startup, serve via
+   `GET /api/v1/curriculum` (grade filter).
+4. **Lesson-scoped question generation** — extend `generate_questions.txt`
+   and the generate request schema with optional lesson context
+   (`lesson_id` → keywords/focus).
+5. **Attempts + lesson status** — `POST /api/v1/attempts` (curriculum and
+   adhoc modes, `lesson_progress` upsert with the ≥95% rule) and
+   `GET /profiles/{id}/lesson-status`.
+6. **Admin API** — generate `MATH_BUDDY_ADMIN_TOKEN` (local `.env` + GCP
+   Secret Manager), single admin auth dependency (constant-time compare,
+   404 on failure), and the four `/api/v1/admin/*` endpoints.
+7. **Backend tests** — everything listed in §8 Backend.
+
+### Phase 2 — Frontend
+
+1. **API client + context** — new `api.js` functions for every Phase 1
+   endpoint; extend `SessionContext` with profile, curriculum-mode
+   `lesson_id`, and grade → `ageGroup` mapping.
+2. **Profile entry screen** — lookup → confirm-before-create dialog,
+   `localStorage` identity caching, header profile switcher.
+3. **Grade-gated topic selector + lesson picker** — 4 existing cards for
+   grade 6; plus 8 unit cards, lesson list, and completion badges for
+   grade 7; fixed 25 questions in curriculum mode.
+4. **Attempt saving** — `POST /api/v1/attempts` after every evaluation
+   (curriculum and ad-hoc), retry once, non-blocking failure banner.
+5. **Dashboard mastery messaging** — "Lesson mastered" state at ≥95%,
+   "keep practicing" retry with a fresh set of questions.
+6. **Admin page** — `/admin/<token>` route tree: profile list, daily
+   progress calendar, attempt history table, per-lesson mastery grid.
+7. **Frontend tests** — everything listed in §8 Frontend.
