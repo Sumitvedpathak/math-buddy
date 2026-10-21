@@ -142,6 +142,9 @@ async def generate_questions(
                 extra={"attempt": attempt + 1, "error": str(exc)},
             )
 
+    if isinstance(last_error, LLMServiceError):
+        raise last_error  # already carries a message that is fine to show the user
+
     final_msg = f"Question generation failed after {MAX_RETRIES + 1} attempt(s): {last_error}"
     logger.error(final_msg)
     raise LLMServiceError(final_msg) from last_error

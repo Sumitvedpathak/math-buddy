@@ -48,6 +48,24 @@ describe('generateQuestions', () => {
   })
 })
 
+describe('API errors', () => {
+  it("shows the server's own message instead of raw JSON, and keeps the status", async () => {
+    fetch.mockResolvedValue(jsonResponse({ detail: 'The AI helper is busy right now. Please try again in a moment.' }, 503))
+    await expect(generateQuestions(['Algebra'], '11-12', 25, '7.1')).rejects.toMatchObject({
+      message: 'The AI helper is busy right now. Please try again in a moment.',
+      status: 503,
+    })
+  })
+
+  it('falls back to the status and raw body when there is no string detail', async () => {
+    fetch.mockResolvedValue(jsonResponse({ detail: [{ msg: 'bad' }] }, 422))
+    await expect(generateQuestions(['Algebra'], '11-12', 25)).rejects.toMatchObject({
+      message: expect.stringContaining('API error 422'),
+      status: 422,
+    })
+  })
+})
+
 describe('profiles', () => {
   it('lookupProfile returns null when nothing exists and never POSTs', async () => {
     fetch.mockResolvedValue(jsonResponse({ exists: false, profile: null }))

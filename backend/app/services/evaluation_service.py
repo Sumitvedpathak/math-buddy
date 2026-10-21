@@ -141,7 +141,12 @@ async def evaluate_answers(
     )
 
     try:
-        raw = await call_llm(prompt, images=sketch_images if sketch_images else None)
+        try:
+            raw = await call_llm(prompt, images=sketch_images if sketch_images else None)
+        except ValueError as exc:  # the model answered, but not with valid JSON
+            raise LLMServiceError(
+                "The AI helper's marking came back garbled. Please try again."
+            ) from exc
     except LLMServiceError:
         logger.error(
             "Evaluation failed — LLM call unsuccessful",
