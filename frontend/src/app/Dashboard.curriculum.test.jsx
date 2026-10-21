@@ -6,7 +6,7 @@ import { SessionContext } from '../context/SessionContext'
 
 const CURRICULUM = [
   { id: 'unit-10', number: 10, title: 'Patterning and Algebra',
-    lessons: [{ id: '10.3', title: 'Variables in Expressions', focus: '', keywords: [] }] },
+    lessons: [{ id: '10.3', title: 'Variables in Expressions', focus: '', keywords: [], theory_pages: 2 }] },
 ]
 
 function renderDashboard({ totalScore, maxScore, ...stateOverrides }) {
@@ -27,6 +27,7 @@ function renderDashboard({ totalScore, maxScore, ...stateOverrides }) {
     },
     resetSession: vi.fn(),
     startLesson: vi.fn(),
+    openLesson: vi.fn(),
   }
   render(
     <SessionContext.Provider value={ctx}>
@@ -60,6 +61,17 @@ describe('Dashboard — curriculum lesson outcome', () => {
 
     await user.click(screen.getByRole('button', { name: /try again with new questions/i }))
     expect(ctx.startLesson).toHaveBeenCalledWith('10.3')
+  })
+
+  it('offers to re-read the lesson when not yet mastered', async () => {
+    const { ctx, user } = renderDashboard({ totalScore: 40, maxScore: 50 })
+    await user.click(screen.getByRole('button', { name: /read the lesson again/i }))
+    expect(ctx.openLesson).toHaveBeenCalledWith('10.3')
+  })
+
+  it('does not offer re-reading once the lesson is mastered', () => {
+    renderDashboard({ totalScore: 50, maxScore: 50 })
+    expect(screen.queryByRole('button', { name: /read the lesson again/i })).not.toBeInTheDocument()
   })
 
   it('"Back to lessons" resets the session', async () => {

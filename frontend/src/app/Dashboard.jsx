@@ -22,7 +22,7 @@ function contextualMessage(pct) {
 }
 
 export default function Dashboard() {
-  const { state, resetSession, startLesson } = useSession()
+  const { state, resetSession, startLesson, openLesson } = useSession()
   const { evaluationResult, questions, answers: answersRaw, lessonId, curriculum, saveStatus } = state
   const answers = answersRaw ?? {}
   const lesson = lessonId
@@ -127,6 +127,15 @@ export default function Dashboard() {
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
               >
                 Try again with new questions
+              </button>
+            )}
+            {!mastered && lesson?.theory_pages > 0 && (
+              <button
+                type="button"
+                onClick={() => openLesson(lessonId)}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface-elevated"
+              >
+                Read the lesson again
               </button>
             )}
             <button

@@ -19,7 +19,7 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  */
 
 /**
- * @typedef {"profile"|"home"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"} AppScreen
+ * @typedef {"profile"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"} AppScreen
  */
 
 /**
@@ -39,6 +39,7 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  * @property {Array} curriculum - units for the profile's grade (empty for grade 6)
  * @property {Record<string, {completed: boolean, bestScorePct: number}>} lessonStatus
  * @property {string|null} lessonId - set while a curriculum lesson session is active
+ * @property {string|null} theoryLessonId - the lesson whose textbook pages are being read (screen "lesson")
  * @property {"idle"|"saving"|"saved"|"failed"} saveStatus
  */
 
@@ -98,6 +99,7 @@ const INITIAL_STATE = {
   curriculum: [],
   lessonStatus: {},
   lessonId: null,
+  theoryLessonId: null,
   saveStatus: 'idle',
 }
 
@@ -308,6 +310,20 @@ export function SessionProvider({ children }) {
     })
   }, [runGeneration, state.curriculum, state.ageGroup])
 
+  /**
+   * Open a curriculum lesson: read its textbook pages first, then practise.
+   * Lessons without reading pages go straight to practice.
+   */
+  const openLesson = useCallback((lessonId) => {
+    const lesson = state.curriculum
+      .flatMap((u) => u.lessons)
+      .find((l) => l.id === lessonId)
+    if (!lesson) return undefined
+    if (!(lesson.theory_pages > 0)) return startLesson(lessonId)
+    setState((s) => ({ ...s, screen: 'lesson', theoryLessonId: lessonId, error: null }))
+    return undefined
+  }, [state.curriculum, startLesson])
+
   /** Persist the finished session in the background; never blocks the child. */
   const persistAttempt = useCallback(async (result) => {
     if (!state.profile) return
@@ -380,6 +396,7 @@ export function SessionProvider({ children }) {
     setAnswer,
     startSession,
     startLesson,
+    openLesson,
     submitAnswers,
     resetSession,
     goHome,

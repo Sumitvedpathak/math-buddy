@@ -12,7 +12,7 @@ const CURRICULUM = [
   {
     id: 'unit-02', number: 2, title: 'Ratio and Rate',
     lessons: [
-      { id: '2.1', title: 'What Is a Ratio?', focus: 'Investigate ratios.', keywords: [] },
+      { id: '2.1', title: 'What Is a Ratio?', focus: 'Investigate ratios.', keywords: [], theory_pages: 2 },
       { id: '2.2', title: 'Equivalent Ratios', focus: 'Write equivalent ratios.', keywords: [] },
       { id: '2.3', title: 'Comparing Ratios', focus: 'Compare ratios.', keywords: [] },
     ],
@@ -45,6 +45,7 @@ function renderSetup(stateOverrides = {}, actionOverrides = {}) {
     setQuestionCount: vi.fn(),
     startSession: vi.fn(),
     startLesson: vi.fn(),
+    openLesson: vi.fn(),
     setAnswer: vi.fn(),
     submitAnswers: vi.fn(),
     ...actionOverrides,
@@ -124,8 +125,10 @@ describe('setup stage — lesson picker', () => {
     expect(within(lessons).getByText(/set of 25 questions/i)).toBeInTheDocument()
     expect(within(lessons).queryByRole('spinbutton')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /practice lesson 2\.2/i }))
-    expect(ctx.startLesson).toHaveBeenCalledWith('2.2')
+    // Opens the lesson (read-through first); the lesson screen starts the practice.
+    await user.click(screen.getByRole('button', { name: /start lesson 2\.2/i }))
+    expect(ctx.openLesson).toHaveBeenCalledWith('2.2')
+    expect(ctx.startLesson).not.toHaveBeenCalled()
     expect(ctx.startSession).not.toHaveBeenCalled()
   })
 

@@ -13,7 +13,7 @@ import FractionText from './FractionText'
  * @param {number} [total] - total question count for position display
  */
 export default function QuestionCard({ question, answer, onAnswer, questionNumber, total }) {
-  const [mode, setMode] = useState(/** @type {"sketch"|"text"} */ ('sketch'))
+  const [mode, setMode] = useState(/** @type {"sketch"|"text"} */ ('text'))
 
   const handleSketchExport = useCallback(
     (dataUrl) => { onAnswer(question.id, 'sketch', dataUrl) },

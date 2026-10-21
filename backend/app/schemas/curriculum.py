@@ -6,6 +6,10 @@ class LessonSchema(BaseModel):
     title: str
     keywords: list[str]
     focus: str
+    # Number of textbook pages to read before practising, shown from
+    # frontend/public/lessons/<id>/<n>.jpg (built by scripts/build_lesson_theory.py).
+    # 0 = no reading, go straight to practice.
+    theory_pages: int = 0
 
 
 class UnitSchema(BaseModel):

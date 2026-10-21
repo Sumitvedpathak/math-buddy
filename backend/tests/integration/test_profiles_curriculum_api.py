@@ -53,6 +53,13 @@ async def test_curriculum_has_all_units_and_lessons(client):
             assert lesson["title"] and lesson["focus"] and lesson["keywords"]
 
 
+async def test_every_lesson_has_theory_pages(client):
+    units = (await client.get("/api/v1/curriculum")).json()["units"]
+    counts = {l["id"]: l["theory_pages"] for u in units for l in u["lessons"]}
+    assert len(counts) == 46
+    assert all(isinstance(n, int) and n >= 1 for n in counts.values())
+
+
 async def test_curriculum_grade_filter(client):
     grade7 = (await client.get("/api/v1/curriculum", params={"grade": "7"})).json()["units"]
     grade6 = (await client.get("/api/v1/curriculum", params={"grade": "6"})).json()["units"]

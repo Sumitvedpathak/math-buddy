@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext'
 import { theme, setTheme } from '../themes/dandysWorld'
 import HomeScreen from './HomeScreen'
 import ProfileScreen from './ProfileScreen'
+import LessonTheory from './LessonTheory'
 import LoadingScreen from '../components/LoadingScreen'
 import PracticePage from './PracticePage'
 import Dashboard from './Dashboard'
@@ -29,6 +30,8 @@ export default function App() {
         return <ProfileScreen />
       case 'home':
         return <HomeScreen />
+      case 'lesson':
+        return <LessonTheory />
       case 'loading':
         return <LoadingScreen funFacts={state.funFacts} message="Generating your questions…" />
       case 'practice':

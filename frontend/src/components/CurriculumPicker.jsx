@@ -3,10 +3,10 @@ import { CURRICULUM_QUESTION_COUNT } from '../context/SessionContext'
 
 /**
  * Unit cards that expand into a lesson list. Each lesson shows a mastered badge
- * (from /lesson-status) and a Practice button that starts a fixed-size session.
+ * (from /lesson-status) and a button that opens the lesson (read-through first, then practice).
  *
  * @param {Object} props
- * @param {Array<{id: string, number: number, title: string, lessons: Array<{id: string, title: string, focus: string}>}>} props.units
+ * @param {Array<{id: string, number: number, title: string, lessons: Array<{id: string, title: string, focus: string, theory_pages?: number}>}>} props.units
  * @param {Record<string, {completed: boolean, bestScorePct: number}>} props.lessonStatus
  * @param {(lessonId: string) => void} props.onPractice
  */
@@ -73,10 +73,10 @@ export default function CurriculumPicker({ units, lessonStatus, onPractice }) {
                     <button
                       type="button"
                       onClick={() => onPractice(lesson.id)}
-                      aria-label={`Practice lesson ${lesson.id}: ${lesson.title}`}
+                      aria-label={`Start lesson ${lesson.id}: ${lesson.title}`}
                       className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
                     >
-                      Practice
+                      {lesson.theory_pages > 0 ? 'Learn & practise' : 'Practise'}
                     </button>
                   </div>
                 </li>
@@ -84,7 +84,8 @@ export default function CurriculumPicker({ units, lessonStatus, onPractice }) {
             })}
           </ul>
           <p className="px-3 pb-2 pt-1 text-xs text-muted-foreground">
-            Each lesson is a set of {CURRICULUM_QUESTION_COUNT} questions. Score 95% or more to master it.
+            Each lesson starts with a short read-through, then a set of {CURRICULUM_QUESTION_COUNT} questions.
+            Score 95% or more to master it.
           </p>
         </section>
       ))}

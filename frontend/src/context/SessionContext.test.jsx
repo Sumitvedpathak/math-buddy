@@ -20,7 +20,10 @@ vi.mock('../lib/api', async () => {
 const PROFILE = { id: 'p1', email: 'kid@example.com', displayName: 'Sam', grade: '7' }
 const CURRICULUM = [
   { id: 'unit-10', number: 10, title: 'Patterning and Algebra',
-    lessons: [{ id: '10.3', title: 'Variables in Expressions', focus: 'f', keywords: ['variable'] }] },
+    lessons: [
+      { id: '10.3', title: 'Variables in Expressions', focus: 'f', keywords: ['variable'], theory_pages: 2 },
+      { id: '10.4', title: 'Evaluating Algebraic Expressions', focus: 'f', keywords: [], theory_pages: 0 },
+    ] },
 ]
 const QUESTION = { id: 'q1', topic: 'Variables in Expressions', problem_type: 'lesson', text: '3n + 1', difficulty_tier: 1 }
 const EVALUATION = {
@@ -132,6 +135,50 @@ describe('profile bootstrap', () => {
 
     await act(() => ctx.enterProfile(PROFILE))
     expect(ctx.state.screen).toBe('practice')
+  })
+})
+
+describe('lesson read-through', () => {
+  it('openLesson shows the lesson pages first and does not generate questions yet', async () => {
+    await signIn()
+    await act(() => ctx.openLesson('10.3'))
+
+    expect(ctx.state.screen).toBe('lesson')
+    expect(ctx.state.theoryLessonId).toBe('10.3')
+    expect(api.generateQuestions).not.toHaveBeenCalled()
+  })
+
+  it('starting practice from the lesson screen then generates the lesson questions', async () => {
+    await signIn()
+    await act(() => ctx.openLesson('10.3'))
+    await act(() => ctx.startLesson('10.3'))
+
+    expect(api.generateQuestions).toHaveBeenCalledWith(['Variables in Expressions'], '11-12', 25, '10.3')
+    expect(ctx.state.screen).toBe('practice')
+    expect(ctx.state.lessonId).toBe('10.3')
+  })
+
+  it('a lesson with no reading pages goes straight to practice', async () => {
+    await signIn()
+    await act(() => ctx.openLesson('10.4'))
+
+    expect(api.generateQuestions).toHaveBeenCalledTimes(1)
+    expect(ctx.state.screen).toBe('practice')
+  })
+
+  it('ignores an unknown lesson', async () => {
+    await signIn()
+    await act(() => ctx.openLesson('99.9'))
+    expect(ctx.state.screen).toBe('home')
+    expect(api.generateQuestions).not.toHaveBeenCalled()
+  })
+
+  it('resetSession leaves the lesson screen state behind', async () => {
+    await signIn()
+    await act(() => ctx.openLesson('10.3'))
+    act(() => ctx.resetSession())
+    expect(ctx.state.theoryLessonId).toBeNull()
+    expect(ctx.state.screen).toBe('home')
   })
 })
 

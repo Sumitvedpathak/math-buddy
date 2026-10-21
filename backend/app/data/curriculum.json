@@ -26,7 +26,8 @@
             "part-to-part ratio",
             "terms of a ratio"
           ],
-          "focus": "Use models and diagrams to investigate ratios."
+          "focus": "Use models and diagrams to investigate ratios.",
+          "theory_pages": 2
         },
         {
           "id": "2.2",
@@ -35,7 +36,8 @@
             "equivalent ratios",
             "simplest form"
           ],
-          "focus": "Write equivalent ratios."
+          "focus": "Write equivalent ratios.",
+          "theory_pages": 3
         },
         {
           "id": "2.3",
@@ -44,7 +46,8 @@
             "equivalent ratios",
             "comparing ratios"
           ],
-          "focus": "Use equivalent ratios to compare ratios."
+          "focus": "Use equivalent ratios to compare ratios.",
+          "theory_pages": 3
         },
         {
           "id": "2.4",
@@ -54,7 +57,8 @@
             "scale",
             "proportion"
           ],
-          "focus": "Use ratios to solve problems."
+          "focus": "Use ratios to solve problems.",
+          "theory_pages": 3
         },
         {
           "id": "2.5",
@@ -64,7 +68,8 @@
             "unit rate",
             "average speed"
           ],
-          "focus": "Investigate rates."
+          "focus": "Investigate rates.",
+          "theory_pages": 3
         }
       ]
     },
@@ -86,7 +91,8 @@
             "top view",
             "linking cubes"
           ],
-          "focus": "Recognize and sketch different views of objects."
+          "focus": "Recognize and sketch different views of objects.",
+          "theory_pages": 2
         },
         {
           "id": "3.2",
@@ -98,7 +104,8 @@
             "edges",
             "vertices"
           ],
-          "focus": "Sketch pictures of objects from models and drawings."
+          "focus": "Sketch pictures of objects from models and drawings.",
+          "theory_pages": 3
         },
         {
           "id": "3.3",
@@ -108,7 +115,8 @@
             "prism",
             "pyramid"
           ],
-          "focus": "Build objects from nets."
+          "focus": "Build objects from nets.",
+          "theory_pages": 3
         },
         {
           "id": "3.4",
@@ -119,7 +127,8 @@
             "perimeter",
             "area"
           ],
-          "focus": "Use measurement formulas to introduce the concept of a variable."
+          "focus": "Use measurement formulas to introduce the concept of a variable.",
+          "theory_pages": 2
         },
         {
           "id": "3.5",
@@ -129,7 +138,8 @@
             "rectangular prism",
             "net"
           ],
-          "focus": "Use a formula to calculate the surface area of a rectangular prism."
+          "focus": "Use a formula to calculate the surface area of a rectangular prism.",
+          "theory_pages": 2
         },
         {
           "id": "3.6",
@@ -139,7 +149,8 @@
             "rectangular prism",
             "cubic units"
           ],
-          "focus": "Use a formula to calculate the volume of a rectangular prism."
+          "focus": "Use a formula to calculate the volume of a rectangular prism.",
+          "theory_pages": 2
         }
       ]
     },
@@ -160,7 +171,8 @@
             "equivalent fractions",
             "fraction strips"
           ],
-          "focus": "Find equivalent fractions and add fractions."
+          "focus": "Find equivalent fractions and add fractions.",
+          "theory_pages": 2
         },
         {
           "id": "4.2",
@@ -170,7 +182,8 @@
             "fraction strips",
             "fraction circles"
           ],
-          "focus": "Add fractions using circles or fraction strips."
+          "focus": "Add fractions using circles or fraction strips.",
+          "theory_pages": 2
         },
         {
           "id": "4.3",
@@ -180,7 +193,8 @@
             "adding fractions",
             "mixed numbers"
           ],
-          "focus": "Add fractions using symbols."
+          "focus": "Add fractions using symbols.",
+          "theory_pages": 3
         },
         {
           "id": "4.4",
@@ -190,7 +204,8 @@
             "fraction strips",
             "number line"
           ],
-          "focus": "Subtract fractions using fraction strips and number lines."
+          "focus": "Subtract fractions using fraction strips and number lines.",
+          "theory_pages": 2
         },
         {
           "id": "4.5",
@@ -200,7 +215,8 @@
             "subtracting fractions",
             "mixed numbers"
           ],
-          "focus": "Subtract fractions using symbols."
+          "focus": "Subtract fractions using symbols.",
+          "theory_pages": 2
         },
         {
           "id": "4.6",
@@ -209,7 +225,8 @@
             "repeated addition",
             "multiplying a fraction by a whole number"
           ],
-          "focus": "Multiply a fraction by a whole number."
+          "focus": "Multiply a fraction by a whole number.",
+          "theory_pages": 2
         },
         {
           "id": "4.7",
@@ -219,7 +236,8 @@
             "tenths",
             "estimation"
           ],
-          "focus": "Multiply decimals with tenths."
+          "focus": "Multiply decimals with tenths.",
+          "theory_pages": 3
         },
         {
           "id": "4.8",
@@ -229,7 +247,8 @@
             "tenths",
             "estimation"
           ],
-          "focus": "Divide decimals with tenths."
+          "focus": "Divide decimals with tenths.",
+          "theory_pages": 3
         },
         {
           "id": "4.9",
@@ -239,7 +258,8 @@
             "BEDMAS",
             "decimals"
           ],
-          "focus": "Use the order of operations to evaluate expressions."
+          "focus": "Use the order of operations to evaluate expressions.",
+          "theory_pages": 1
         }
       ]
     },
@@ -270,7 +290,8 @@
             "database",
             "fields"
           ],
-          "focus": "Analyse data collection and possible bias."
+          "focus": "Analyse data collection and possible bias.",
+          "theory_pages": 2
         },
         {
           "id": "5.2",
@@ -280,7 +301,8 @@
             "bar graph",
             "pictograph"
           ],
-          "focus": "Record data in tables, bar graphs, and pictographs."
+          "focus": "Record data in tables, bar graphs, and pictographs.",
+          "theory_pages": 2
         },
         {
           "id": "5.3",
@@ -292,7 +314,8 @@
             "mode",
             "range"
           ],
-          "focus": "Display data using stem-and-leaf plots and find the mean, median, and mode."
+          "focus": "Display data using stem-and-leaf plots and find the mean, median, and mode.",
+          "theory_pages": 3
         },
         {
           "id": "5.4",
@@ -301,7 +324,8 @@
             "line graph",
             "trend"
           ],
-          "focus": "Display data using line graphs and describe trends."
+          "focus": "Display data using line graphs and describe trends.",
+          "theory_pages": 2
         },
         {
           "id": "5.5",
@@ -312,7 +336,8 @@
             "mode",
             "measures of central tendency"
           ],
-          "focus": "Understand which measure of central tendency best describes a set of data."
+          "focus": "Understand which measure of central tendency best describes a set of data.",
+          "theory_pages": 2
         },
         {
           "id": "5.6",
@@ -321,7 +346,8 @@
             "misleading graphs",
             "bias"
           ],
-          "focus": "Examine how data can be misleading."
+          "focus": "Examine how data can be misleading.",
+          "theory_pages": 2
         }
       ]
     },
@@ -347,7 +373,8 @@
             "height",
             "area"
           ],
-          "focus": "Use a formula to find the area of a parallelogram."
+          "focus": "Use a formula to find the area of a parallelogram.",
+          "theory_pages": 2
         },
         {
           "id": "6.2",
@@ -358,7 +385,8 @@
             "height",
             "area"
           ],
-          "focus": "Use a formula to find the area of a triangle."
+          "focus": "Use a formula to find the area of a triangle.",
+          "theory_pages": 2
         },
         {
           "id": "6.3",
@@ -368,7 +396,8 @@
             "area",
             "perimeter"
           ],
-          "focus": "Use a formula to find the area of a trapezoid."
+          "focus": "Use a formula to find the area of a trapezoid.",
+          "theory_pages": 3
         },
         {
           "id": "6.4",
@@ -378,7 +407,8 @@
             "area",
             "perimeter"
           ],
-          "focus": "Find the area and perimeter of an irregular figure."
+          "focus": "Find the area and perimeter of an irregular figure.",
+          "theory_pages": 3
         }
       ]
     },
@@ -402,7 +432,8 @@
             "concave polygon",
             "regular polygon"
           ],
-          "focus": "Identify, describe, and classify geometric figures."
+          "focus": "Identify, describe, and classify geometric figures.",
+          "theory_pages": 3
         },
         {
           "id": "7.2",
@@ -412,7 +443,8 @@
             "corresponding sides",
             "corresponding angles"
           ],
-          "focus": "Identify the conditions for congruence."
+          "focus": "Identify the conditions for congruence.",
+          "theory_pages": 3
         },
         {
           "id": "7.3",
@@ -423,7 +455,8 @@
             "rotation",
             "transformation image"
           ],
-          "focus": "Recognize transformation images."
+          "focus": "Recognize transformation images.",
+          "theory_pages": 3
         },
         {
           "id": "7.4",
@@ -432,7 +465,8 @@
             "tiling the plane",
             "tessellations"
           ],
-          "focus": "Construct and analyse tiling patterns."
+          "focus": "Construct and analyse tiling patterns.",
+          "theory_pages": 2
         },
         {
           "id": "7.5",
@@ -443,7 +477,8 @@
             "reflection",
             "rotation"
           ],
-          "focus": "Create and analyse designs using transformations."
+          "focus": "Create and analyse designs using transformations.",
+          "theory_pages": 3
         }
       ]
     },
@@ -465,7 +500,8 @@
             "fraction",
             "decimal"
           ],
-          "focus": "Relate percent to fractions and decimals."
+          "focus": "Relate percent to fractions and decimals.",
+          "theory_pages": 3
         },
         {
           "id": "8.2",
@@ -475,7 +511,8 @@
             "estimation",
             "mental math"
           ],
-          "focus": "Use mental math and estimation."
+          "focus": "Use mental math and estimation.",
+          "theory_pages": 3
         },
         {
           "id": "8.3",
@@ -485,7 +522,8 @@
             "percent circle",
             "hundredths"
           ],
-          "focus": "Multiply decimals with hundredths."
+          "focus": "Multiply decimals with hundredths.",
+          "theory_pages": 2
         },
         {
           "id": "8.4",
@@ -495,7 +533,8 @@
             "percent circle",
             "percent"
           ],
-          "focus": "Use circle graphs to display data and solve problems."
+          "focus": "Use circle graphs to display data and solve problems.",
+          "theory_pages": 4
         },
         {
           "id": "8.5",
@@ -505,7 +544,8 @@
             "dividing decimals",
             "hundredths"
           ],
-          "focus": "Divide decimals with hundredths."
+          "focus": "Divide decimals with hundredths.",
+          "theory_pages": 2
         }
       ]
     },
@@ -530,7 +570,8 @@
             "pattern rule",
             "term"
           ],
-          "focus": "Extend patterns and use them to make predictions."
+          "focus": "Extend patterns and use them to make predictions.",
+          "theory_pages": 3
         },
         {
           "id": "10.2",
@@ -540,7 +581,8 @@
             "table of values",
             "graph"
           ],
-          "focus": "Use a table and a graph to describe a pattern."
+          "focus": "Use a table and a graph to describe a pattern.",
+          "theory_pages": 3
         },
         {
           "id": "10.3",
@@ -549,7 +591,8 @@
             "variable",
             "algebraic expression"
           ],
-          "focus": "Use a variable to represent a set of numbers."
+          "focus": "Use a variable to represent a set of numbers.",
+          "theory_pages": 2
         },
         {
           "id": "10.4",
@@ -559,7 +602,8 @@
             "evaluate",
             "substitute"
           ],
-          "focus": "Substitute a number for a variable in an algebraic expression."
+          "focus": "Substitute a number for a variable in an algebraic expression.",
+          "theory_pages": 2
         },
         {
           "id": "10.5",
@@ -568,7 +612,8 @@
             "equation",
             "variable"
           ],
-          "focus": "Translate statements into equations."
+          "focus": "Translate statements into equations.",
+          "theory_pages": 2
         },
         {
           "id": "10.6",
@@ -578,7 +623,8 @@
             "inspection",
             "systematic trial"
           ],
-          "focus": "Solve equations by inspection and by systematic trial."
+          "focus": "Solve equations by inspection and by systematic trial.",
+          "theory_pages": 4
         }
       ]
     }
