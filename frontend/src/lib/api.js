@@ -38,8 +38,18 @@ async function postJson(url, body) {
     body: JSON.stringify(body),
   })
   if (!response.ok) {
-    const detail = await response.text()
-    throw new Error(`API error ${response.status}: ${detail}`)
+    const text = await response.text()
+    let message = `API error ${response.status}: ${text}`
+    try {
+      // Show the server's own message (e.g. "The AI helper is busy…") instead of raw JSON.
+      const { detail } = JSON.parse(text)
+      if (typeof detail === 'string' && detail) message = detail
+    } catch {
+      // not JSON — keep the raw text
+    }
+    const err = new Error(message)
+    err.status = response.status
+    throw err
   }
   return response.json()
 }
