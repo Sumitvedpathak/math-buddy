@@ -4,9 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Math Buddy** is an AI-powered math practice app for children (ages 9–12). Students select topics and age groups, answer questions via sketch or typed text, and receive instant AI-marked feedback with a results dashboard. The app has **zero persistence** — all session state lives in React Context and is cleared on tab close.
+**Math Buddy** is an AI-powered math practice app for children (ages 9–12). Students select topics and age groups, answer questions via sketch or typed text, and receive instant AI-marked feedback with a results dashboard. Session state (questions, answers, results) lives in React Context and is cleared on tab close. Since the grade 7 curriculum work (Oct 2026), child **profiles, attempts and lesson progress persist in Postgres** — see "Grade 7 Curriculum Tracking" below. Postgres is optional: without `MATH_BUDDY_DATABASE_URL` the question/evaluate endpoints still work and the rest return 503.
 
-**Current status**: Just completed EduSpark dark design system migration (May 2026). All 25 tasks complete. App deployed to GCP Cloud Run (frontend: `math-buddy-app`, backend: `math-buddy-api`).
+**Current status**: EduSpark dark design system migration complete (May 2026), deployed to GCP Cloud Run (frontend: `math-buddy-app`, backend: `math-buddy-api`). Grade 7 curriculum tracking (spec: `docs/superpowers/specs/2026-10-20-grade7-curriculum-design.md`) is built on branches `feature/grade7-backend` (Phase 1) and `feature/grade7-frontend` (Phase 2) but **not yet deployed** — Cloud Run still needs a Postgres instance, `MATH_BUDDY_DATABASE_URL` / `MATH_BUDDY_ADMIN_TOKEN` secrets, and `alembic upgrade head`.
+
+---
+
+## Grade 7 Curriculum Tracking
+
+- **Data**: `profiles`, `lesson_progress` (derived; best score never regresses; `completed` once best ≥ 95%, sticky), `practice_attempts` (append-only history for curriculum *and* free practice). Migrations: `cd backend && alembic upgrade head` (needs `MATH_BUDDY_DATABASE_URL`; local Postgres via `docker compose up db`).
+- **Curriculum**: static `backend/app/data/curriculum.json` (8 units / 46 lessons, grade 7; units 1 and 9 not included). Edit the file + redeploy to change it.
+- **Child API**: `GET /profiles/lookup` (read-only), `POST /profiles`, `GET /curriculum`, `POST /attempts`, `GET /profiles/{id}/lesson-status` (no timestamps/history by design). `POST /questions/generate` accepts optional `lesson_id` → lesson-scoped prompt, `problem_type: "lesson"`.
+- **Admin API**: `/api/v1/admin/*`, header `X-Admin-Token` = `MATH_BUDDY_ADMIN_TOKEN` (generate with `python backend/scripts/generate_admin_token.py`). Any auth failure is a generic 404; hidden from `/docs`. Frontend page: `/admin/<token>` (separate route tree in `main.jsx`, never linked from the child app). This is a placeholder for real login — swap only `require_admin` in `backend/app/api/deps.py`.
+- **Frontend flow**: `profile` screen first (email lookup → confirm-before-create → identity-only `localStorage` cache `mathBuddy.profile`) → grade sets `ageGroup` (6→`9-10`, 7→`11-12`) and hides the manual selector. Grade 7 also gets `CurriculumPicker` in the setup stage; lessons are a fixed 25 questions (`CURRICULUM_QUESTION_COUNT`). After evaluation the attempt is saved in the background (`saveAttemptWithRetry`: one retry, then a non-blocking banner). Free-practice attempts store `topic_id` as the sorted selected topic IDs joined with `+`.
 
 ---
 
@@ -43,7 +53,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (37 tests)
+npm run test:run        # Single run (114 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -85,8 +95,8 @@ docker-compose up --build
 ### Frontend (React 18 + Tailwind CSS 3)
 
 **State management**: Single React Context (`SessionContext`) with flat shape — no Redux, no Zustand:
-- Screen enum: `home` | `loading` | `practice` | `evaluating` | `dashboard` | `leaderboard` | `about`
-- Actions: `setAgeGroup`, `toggleTopic`, `setQuestionCount`, `startSession`, `submitAnswers`, `navigateTo`, `resetSession`
+- Screen enum: `profile` | `home` | `loading` | `practice` | `evaluating` | `dashboard` | `leaderboard` | `about`
+- Actions: `setAgeGroup`, `toggleTopic`, `setQuestionCount`, `startSession`, `startLesson`, `submitAnswers`, `navigateTo`, `resetSession`, `findProfile`, `registerProfile`, `enterProfile`, `switchProfile`
 - Session data: questions, answers, evaluation result — all preserved across screens until reset
 
 **No raw `fetch()` in components** — all API calls go through `frontend/src/lib/api.js` (generateQuestions, evaluateAnswers).
@@ -188,12 +198,12 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 14 tests covering question generation, evaluation, and API contracts
+- 60 tests covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already — they patch `openrouter.call_llm` but the service imports from `langchainrouter`. DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 37 tests covering component rendering, user interactions, and session state
+- 114 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)

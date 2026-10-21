@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useSession } from '../context/SessionContext'
 import { theme, setTheme } from '../themes/dandysWorld'
 import HomeScreen from './HomeScreen'
+import ProfileScreen from './ProfileScreen'
 import LoadingScreen from '../components/LoadingScreen'
 import PracticePage from './PracticePage'
 import Dashboard from './Dashboard'
@@ -19,7 +20,13 @@ export default function App() {
   }, [])
 
   function renderScreen() {
+    // Resuming a cached profile — wait for it so grade-gated UI doesn't flash.
+    if (state.profileStatus === 'loading') {
+      return <LoadingScreen funFacts={state.funFacts} message="Loading your profile…" />
+    }
     switch (state.screen) {
+      case 'profile':
+        return <ProfileScreen />
       case 'home':
         return <HomeScreen />
       case 'loading':

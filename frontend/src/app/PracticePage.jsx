@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext'
 import { TOPICS } from '../lib/topics'
 import QuestionCard from '../components/QuestionCard'
 import ErrorBanner from '../components/ErrorBanner'
+import CurriculumPicker from '../components/CurriculumPicker'
 
 const AGE_GROUPS = [
   { id: '9-10',  title: 'Age 9–10',  subtitle: 'Junior Explorer — ~Grade 3–4' },
@@ -14,10 +15,13 @@ const QUICK_COUNTS = [5, 10, 20, 30]
 export default function PracticePage() {
   const {
     state,
-    setAgeGroup, toggleTopic, setQuestionCount, startSession,
+    setAgeGroup, toggleTopic, setQuestionCount, startSession, startLesson,
     setAnswer, submitAnswers,
   } = useSession()
-  const { questions, answers, error, ageGroup, selectedTopics, questionCount } = state
+  const {
+    questions, answers, error, ageGroup, selectedTopics, questionCount,
+    profile, curriculum, lessonStatus,
+  } = state
   const [confirming, setConfirming] = useState(false)
 
   // Show setup when no questions have been loaded yet
@@ -53,6 +57,10 @@ export default function PracticePage() {
       questionCount={questionCount}
       setQuestionCount={setQuestionCount}
       onStart={startSession}
+      profile={profile}
+      curriculum={curriculum ?? []}
+      lessonStatus={lessonStatus ?? {}}
+      onPracticeLesson={startLesson}
     />
   }
 
@@ -153,51 +161,78 @@ export default function PracticePage() {
 }
 
 /* ── Setup Stage ── */
-function SetupStage({ ageGroup, setAgeGroup, selectedTopics, toggleTopic, questionCount, setQuestionCount, onStart }) {
+function SetupStage({
+  ageGroup, setAgeGroup, selectedTopics, toggleTopic, questionCount, setQuestionCount, onStart,
+  profile, curriculum, lessonStatus, onPracticeLesson,
+}) {
   const canStart = selectedTopics.length > 0
+  // A loaded profile already encodes the age group (grade 6 → 9-10, grade 7 → 11-12).
+  const showAgeGroup = !profile
+  const topicsNumber = showAgeGroup ? '02' : '01'
+  const countNumber = showAgeGroup ? '03' : '02'
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
       <header className="mb-10">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ New practice set</p>
-        <h1 className="mt-3 font-display text-4xl md:text-5xl font-semibold text-ink">Configure your session</h1>
+        <h1 className="mt-3 font-display text-4xl md:text-5xl font-semibold text-ink">
+          {profile ? `Hi ${profile.displayName}, what shall we practise?` : 'Configure your session'}
+        </h1>
         <p className="mt-3 text-ink-soft max-w-2xl">
-          Three quick choices. We&apos;ll generate a focused, mixed set tailored to your selection.
+          {profile
+            ? (curriculum.length > 0
+              ? 'Pick a lesson from your course, or put together a free practice set.'
+              : 'Pick your topics and how many questions you want.')
+            : 'Three quick choices. We’ll generate a focused, mixed set tailored to your selection.'}
         </p>
       </header>
 
+      {curriculum.length > 0 && (
+        <section className="mb-8 rounded-2xl bg-card ring-soft p-6 md:p-8" aria-labelledby="curriculum-heading">
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-5">
+            <h2 id="curriculum-heading" className="font-display text-xl font-semibold text-ink">
+              Grade {profile?.grade} curriculum
+            </h2>
+            <span className="text-xs text-muted-foreground">Pick a unit, then a lesson.</span>
+          </div>
+          <CurriculumPicker units={curriculum} lessonStatus={lessonStatus} onPractice={onPracticeLesson} />
+        </section>
+      )}
+
       <div className="rounded-2xl bg-card ring-soft overflow-hidden">
 
-        {/* 01 Age group */}
-        <Section number="01" title="Age group" hint="Difficulty scales with your selection.">
-          <div className="grid sm:grid-cols-2 gap-3">
-            {AGE_GROUPS.map((g) => {
-              const active = ageGroup === g.id
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setAgeGroup(g.id)}
-                  className={[
-                    'text-left rounded-xl border p-5 transition-all',
-                    active
-                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                      : 'border-border bg-surface hover:border-ink/20',
-                  ].join(' ')}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-display text-lg font-semibold text-ink">{g.title}</span>
-                    <span className={`h-4 w-4 rounded-full border-2 ${active ? 'border-primary bg-primary' : 'border-border'}`} />
-                  </div>
-                  <p className="mt-1 text-sm text-ink-soft">{g.subtitle}</p>
-                </button>
-              )
-            })}
-          </div>
-        </Section>
+        {/* Age group — hidden once a profile is loaded */}
+        {showAgeGroup && (
+          <Section number="01" title="Age group" hint="Difficulty scales with your selection.">
+            <div className="grid sm:grid-cols-2 gap-3">
+              {AGE_GROUPS.map((g) => {
+                const active = ageGroup === g.id
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setAgeGroup(g.id)}
+                    className={[
+                      'text-left rounded-xl border p-5 transition-all',
+                      active
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                        : 'border-border bg-surface hover:border-ink/20',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-display text-lg font-semibold text-ink">{g.title}</span>
+                      <span className={`h-4 w-4 rounded-full border-2 ${active ? 'border-primary bg-primary' : 'border-border'}`} />
+                    </div>
+                    <p className="mt-1 text-sm text-ink-soft">{g.subtitle}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </Section>
+        )}
 
-        {/* 02 Topics */}
-        <Section number="02" title="Topics" hint="Pick one or more — we'll mix them.">
+        {/* Topics */}
+        <Section number={topicsNumber} title="Topics" hint="Pick one or more — we'll mix them.">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {TOPICS.filter((t) => t.enabled).map((t) => {
               const active = selectedTopics.includes(t.id)
@@ -232,8 +267,8 @@ function SetupStage({ ageGroup, setAgeGroup, selectedTopics, toggleTopic, questi
           )}
         </Section>
 
-        {/* 03 Question count */}
-        <Section number="03" title="Number of questions" hint="Between 1 and 100.">
+        {/* Question count (free practice only — curriculum lessons are fixed at 25) */}
+        <Section number={countNumber} title="Number of questions" hint="Between 1 and 100.">
           <div className="flex flex-wrap items-center gap-6">
             <div className="inline-flex items-center rounded-lg border border-border bg-surface overflow-hidden">
               <button

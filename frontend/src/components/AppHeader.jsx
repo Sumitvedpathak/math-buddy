@@ -9,8 +9,9 @@ const NAV_LINKS = [
 ]
 
 export default function AppHeader() {
-  const { state, navigateTo } = useSession()
+  const { state, navigateTo, switchProfile } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
+  const profile = state.profile
 
   const handleNav = useCallback((screen) => {
     navigateTo(screen)
@@ -74,6 +75,22 @@ export default function AppHeader() {
           })}
         </nav>
 
+        {/* Active profile + switcher (e.g. a sibling sharing the device) */}
+        {profile && (
+          <div className="hidden md:flex items-center gap-2 text-sm text-ink-soft">
+            <span>
+              {profile.displayName} · Grade {profile.grade}
+            </span>
+            <button
+              type="button"
+              onClick={switchProfile}
+              className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-elevated hover:text-ink"
+            >
+              Switch profile
+            </button>
+          </div>
+        )}
+
         {/* Desktop CTA */}
         <button
           type="button"
@@ -123,6 +140,15 @@ export default function AppHeader() {
               </button>
             )
           })}
+          {profile && (
+            <button
+              type="button"
+              onClick={() => { switchProfile(); setMenuOpen(false) }}
+              className="flex w-full items-center rounded-md px-4 py-3 text-sm text-ink-soft hover:bg-surface-elevated hover:text-ink"
+            >
+              Switch profile ({profile.displayName})
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleNav('practice')}
