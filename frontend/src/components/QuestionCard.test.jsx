@@ -34,18 +34,25 @@ describe('QuestionCard', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
-  it('calls onAnswer with sketch mode when canvas triggers export', () => {
-    // Minimal: just verify the component renders without crashing in sketch mode
+  it('defaults to text mode, with no sketch canvas shown', () => {
     render(<QuestionCard question={QUESTION} answer={null} onAnswer={vi.fn()} questionNumber={1} />)
-    expect(screen.getByTestId('sketch-canvas')).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    expect(screen.queryByTestId('sketch-canvas')).not.toBeInTheDocument()
   })
 
-  it('renders text mode toggle', async () => {
+  it('switches to the sketch canvas on request', async () => {
     const user = userEvent.setup()
     render(<QuestionCard question={QUESTION} answer={null} onAnswer={vi.fn()} questionNumber={1} />)
-    const textBtns = screen.getAllByRole('button', { name: /text/i })
-    expect(textBtns.length).toBeGreaterThan(0)
-    await user.click(textBtns[0])
-    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /sketch/i }))
+    expect(screen.getByTestId('sketch-canvas')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('reports typed answers in text mode', async () => {
+    const user = userEvent.setup()
+    const onAnswer = vi.fn()
+    render(<QuestionCard question={QUESTION} answer={null} onAnswer={onAnswer} questionNumber={1} />)
+    await user.type(screen.getByRole('textbox'), '2')
+    expect(onAnswer).toHaveBeenCalledWith('q1', 'text', '2')
   })
 })
