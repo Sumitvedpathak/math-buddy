@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.db import normalize_database_url
+from app.db import connect_args_for, normalize_database_url
 from app.models.tables import Base
 
 load_dotenv()
@@ -46,6 +46,7 @@ async def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args_for(config.get_main_option("sqlalchemy.url")),
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

@@ -1,0 +1,19 @@
+# Never bake secrets or local state into the image
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+dev.db
+*.db
+
+# Not needed at runtime
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+scripts/
+test_llm.py
+uv.lock
