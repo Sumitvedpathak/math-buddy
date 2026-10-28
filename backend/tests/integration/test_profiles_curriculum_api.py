@@ -43,10 +43,10 @@ async def test_curriculum_has_all_units_and_lessons(client):
     resp = await client.get("/api/v1/curriculum")
     assert resp.status_code == 200
     units = resp.json()["units"]
-    assert [u["number"] for u in units] == [2, 3, 4, 5, 6, 7, 8, 10]
+    assert [u["number"] for u in units] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     lesson_ids = [l["id"] for u in units for l in u["lessons"]]
-    assert len(lesson_ids) == 46
-    assert len(set(lesson_ids)) == 46
+    assert len(lesson_ids) == 58
+    assert len(set(lesson_ids)) == 58
     for unit in units:
         for lesson in unit["lessons"]:
             assert lesson["id"].startswith(f"{unit['number']}.")
@@ -56,13 +56,13 @@ async def test_curriculum_has_all_units_and_lessons(client):
 async def test_every_lesson_has_theory_pages(client):
     units = (await client.get("/api/v1/curriculum")).json()["units"]
     counts = {l["id"]: l["theory_pages"] for u in units for l in u["lessons"]}
-    assert len(counts) == 46
+    assert len(counts) == 58
     assert all(isinstance(n, int) and n >= 1 for n in counts.values())
 
 
 async def test_curriculum_grade_filter(client):
     grade7 = (await client.get("/api/v1/curriculum", params={"grade": "7"})).json()["units"]
     grade6 = (await client.get("/api/v1/curriculum", params={"grade": "6"})).json()["units"]
-    assert len(grade7) == 8
+    assert len(grade7) == 10
     assert grade6 == []
     assert (await client.get("/api/v1/curriculum", params={"grade": "9"})).status_code == 422

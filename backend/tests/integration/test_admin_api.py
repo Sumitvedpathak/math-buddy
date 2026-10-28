@@ -116,7 +116,7 @@ async def test_lesson_progress_covers_every_lesson(client, admin_token, profile_
     h = {"X-Admin-Token": admin_token}
     await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 24, lesson_id="2.1"))
     rows = (await client.get(f"/api/v1/admin/profiles/{profile_id}/lesson-progress", headers=h)).json()
-    assert len(rows) == 46
+    assert len(rows) == 58
     by_id = {r["lesson_id"]: r for r in rows}
     assert by_id["2.1"]["completed"] is True and by_id["2.1"]["attempts_count"] == 1
     assert by_id["2.1"]["last_attempt_at"] is not None

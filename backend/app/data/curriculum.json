@@ -1,6 +1,93 @@
 {
   "units": [
     {
+      "id": "unit-01",
+      "number": 1,
+      "title": "Patterns in Whole Numbers",
+      "grade": "7",
+      "keywords": [
+        "factor",
+        "prime number",
+        "composite number",
+        "greatest common factor (GCF)",
+        "multiple",
+        "lowest common multiple (LCM)",
+        "square number",
+        "square root",
+        "exponent form",
+        "base",
+        "exponent",
+        "power",
+        "cube number",
+        "perfect square",
+        "perfect cube"
+      ],
+      "lessons": [
+        {
+          "id": "1.1",
+          "title": "Numbers All Around Us",
+          "keywords": [
+            "mental math",
+            "estimation",
+            "choosing a strategy"
+          ],
+          "focus": "Justify the choice of strategy when solving problems.",
+          "theory_pages": 2
+        },
+        {
+          "id": "1.2",
+          "title": "Factors and Multiples",
+          "keywords": [
+            "factor",
+            "prime number",
+            "composite number",
+            "greatest common factor (GCF)",
+            "multiple",
+            "lowest common multiple (LCM)"
+          ],
+          "focus": "Generate factors and multiples of given numbers.",
+          "theory_pages": 3
+        },
+        {
+          "id": "1.3",
+          "title": "Squares and Square Roots",
+          "keywords": [
+            "square number",
+            "square root",
+            "perfect square"
+          ],
+          "focus": "Find the squares and square roots of whole numbers.",
+          "theory_pages": 2
+        },
+        {
+          "id": "1.4",
+          "title": "Exponents",
+          "keywords": [
+            "exponent form",
+            "base",
+            "exponent",
+            "power",
+            "cube number",
+            "perfect square",
+            "perfect cube"
+          ],
+          "focus": "Use exponents to represent repeated multiplication.",
+          "theory_pages": 3
+        },
+        {
+          "id": "1.5",
+          "title": "Number Patterns",
+          "keywords": [
+            "number pattern",
+            "pattern rule",
+            "Pascal's Triangle"
+          ],
+          "focus": "Describe, extend, and explain patterns.",
+          "theory_pages": 2
+        }
+      ]
+    },
+    {
       "id": "unit-02",
       "number": 2,
       "title": "Ratio and Rate",
@@ -546,6 +633,99 @@
           ],
           "focus": "Divide decimals with hundredths.",
           "theory_pages": 2
+        }
+      ]
+    },
+    {
+      "id": "unit-09",
+      "number": 9,
+      "title": "Integers",
+      "grade": "7",
+      "keywords": [
+        "positive number",
+        "negative number",
+        "integer",
+        "positive integer",
+        "negative integer",
+        "opposite integers",
+        "zero pair"
+      ],
+      "lessons": [
+        {
+          "id": "9.1",
+          "title": "What Is an Integer?",
+          "keywords": [
+            "integer",
+            "positive integer",
+            "negative integer",
+            "opposite integers"
+          ],
+          "focus": "Use real-world applications of integers.",
+          "theory_pages": 2
+        },
+        {
+          "id": "9.2",
+          "title": "Comparing and Ordering Integers",
+          "keywords": [
+            "integer",
+            "number line",
+            "greater than",
+            "less than"
+          ],
+          "focus": "Use a number line to order and compare integers.",
+          "theory_pages": 2
+        },
+        {
+          "id": "9.3",
+          "title": "Representing Integers",
+          "keywords": [
+            "coloured tiles",
+            "zero pair"
+          ],
+          "focus": "Use coloured tiles to represent integers.",
+          "theory_pages": 2
+        },
+        {
+          "id": "9.4",
+          "title": "Adding Integers with Tiles",
+          "keywords": [
+            "coloured tiles",
+            "zero pair",
+            "adding integers"
+          ],
+          "focus": "Use coloured tiles to add integers.",
+          "theory_pages": 2
+        },
+        {
+          "id": "9.5",
+          "title": "Adding Integers",
+          "keywords": [
+            "number line",
+            "adding integers"
+          ],
+          "focus": "Add integers using number lines and patterns.",
+          "theory_pages": 2
+        },
+        {
+          "id": "9.6",
+          "title": "Subtracting Integers with Tiles",
+          "keywords": [
+            "coloured tiles",
+            "zero pair",
+            "subtracting integers"
+          ],
+          "focus": "Use coloured tiles to subtract integers.",
+          "theory_pages": 3
+        },
+        {
+          "id": "9.7",
+          "title": "Subtracting Integers",
+          "keywords": [
+            "number line",
+            "subtracting integers"
+          ],
+          "focus": "Subtract integers using number lines and patterns.",
+          "theory_pages": 3
         }
       ]
     },
