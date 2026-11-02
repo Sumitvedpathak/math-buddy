@@ -189,6 +189,42 @@ describe('WritingCoach', () => {
     expect(screen.getByText(/at the top of your page/)).toBeInTheDocument()
   })
 
+  it('has a Back button on each step to return to the previous one', async () => {
+    wc.createSession.mockResolvedValue({ id: 's1', subject: 'history', item: ITEM, decode: null })
+    const { navigateTo, user } = renderApp()
+    await screen.findByText(/Before you start/)
+    await user.click(screen.getByRole('button', { name: /Back to Math Buddy/ }))
+    expect(navigateTo).toHaveBeenCalledWith('practice')
+
+    for (const box of screen.getAllByRole('checkbox')) await user.click(box)
+    await user.click(screen.getByRole('button', { name: 'Show my question' }))
+    await screen.findByText(ITEM.question)
+
+    await user.click(screen.getByRole('button', { name: /Back/ }))
+    await screen.findByText(/Before you start/)
+
+    // the criteria must be ticked again before every practice
+    expect(screen.getByRole('button', { name: 'Show my question' })).toBeDisabled()
+    for (const box of screen.getAllByRole('checkbox')) await user.click(box)
+    await user.click(screen.getByRole('button', { name: 'Show my question' }))
+    await screen.findByText(ITEM.question)
+    wc.decode.mockResolvedValue({
+      command_words_correct: true, parts_correct: true, focus_correct: true,
+      answer: { command_words: ['Explain'], parts: 1, thinking_focus: 'Cause and Consequence' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Explain' }))
+    await user.selectOptions(screen.getByLabelText(/thinking focus/i), 'Cause and Consequence')
+    await user.click(screen.getByRole('button', { name: 'Check my decoding' }))
+    await user.click(await screen.findByRole('button', { name: 'Start writing' }))
+    await screen.findByRole('timer')
+    await user.click(screen.getByRole('button', { name: /take a photo/i }))
+    await screen.findByText(/Photograph your answer/)
+    await user.click(screen.getByRole('button', { name: /Back/ }))
+    await screen.findByRole('timer')
+    await user.click(screen.getByRole('button', { name: /Back/ }))
+    await screen.findByText(ITEM.question)
+  })
+
   it('shows a friendly message when the question cannot be made', async () => {
     wc.createSession.mockRejectedValue(new Error('The AI helper is busy right now. Please try again in a moment.'))
     const { user } = renderApp()

@@ -51,6 +51,20 @@ export function stepFromReport(report) {
   return { step: 'question', kind: 'draft' }
 }
 
+function BackBar({ onBack, label = 'Back' }) {
+  return (
+    <div className="mx-auto max-w-6xl px-6 pt-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink"
+      >
+        <span aria-hidden="true">←</span> {label}
+      </button>
+    </div>
+  )
+}
+
 export default function WritingCoach() {
   const { state, navigateTo } = useSession()
   const profile = state.profile
@@ -213,6 +227,7 @@ export default function WritingCoach() {
     case 'start':
       return (
         <>
+          <BackBar label="Back to Math Buddy" onBack={() => navigateTo('practice')} />
           {errorBanner}
           {reminder && (
             <Start reminder={reminder} busy={busy} onBegin={begin} onHistory={() => setStep('history')} />
@@ -221,11 +236,12 @@ export default function WritingCoach() {
       )
     case 'history':
       return (
-        <History profileId={profileId} onBack={() => navigateTo('practice')} onNew={() => setStep('start')} />
+        <History profileId={profileId} onBack={() => setStep('start')} onNew={() => setStep('start')} />
       )
     case 'question':
       return (
         <>
+          <BackBar onBack={() => { setError(null); setStep('start') }} />
           {errorBanner}
           <QuestionDecode
             session={session}
@@ -241,39 +257,57 @@ export default function WritingCoach() {
       )
     case 'write':
       return (
-        <WriteStep
-          key={kind}
-          session={session}
-          kind={kind}
-          minutes={kind === 'rewrite' ? REWRITE_MINUTES : DRAFT_MINUTES}
-          feedback={kind === 'rewrite' ? feedback : null}
-          onDone={() => setStep('upload')}
-        />
+        <>
+          <BackBar
+            label={kind === 'rewrite' ? 'Back to my draft report' : 'Back'}
+            onBack={() => {
+              if (kind === 'rewrite') { setKind('draft'); setStep('report') } else setStep('question')
+            }}
+          />
+          <WriteStep
+            key={kind}
+            session={session}
+            kind={kind}
+            minutes={kind === 'rewrite' ? REWRITE_MINUTES : DRAFT_MINUTES}
+            feedback={kind === 'rewrite' ? feedback : null}
+            onDone={() => setStep('upload')}
+          />
+        </>
       )
     case 'upload':
       return (
-        <UploadStep
-          title={kind === 'rewrite' ? 'Photograph your rewrite' : 'Photograph your answer'}
-          busy={busy}
-          error={error}
-          onRead={readPhotos}
-        />
+        <>
+          <BackBar onBack={() => { setError(null); setStep('write') }} />
+          <UploadStep
+            title={kind === 'rewrite' ? 'Photograph your rewrite' : 'Photograph your answer'}
+            busy={busy}
+            error={error}
+            onRead={readPhotos}
+          />
+        </>
       )
     case 'confirm':
       return (
-        <ConfirmStep
-          key={submission.id}
-          images={images}
-          transcript={submission.transcript}
-          busy={busy}
-          error={error}
-          onConfirm={confirmText}
-        />
+        <>
+          <BackBar label="Back to photos" onBack={() => { setError(null); setStep('upload') }} />
+          <ConfirmStep
+            key={submission.id}
+            images={images}
+            transcript={submission.transcript}
+            busy={busy}
+            error={error}
+            onConfirm={confirmText}
+          />
+        </>
       )
     case 'reviewing':
       return <p className="px-6 py-16 text-center text-ink-soft" role="status">Marking your answer…</p>
     case 'report':
       return (
+        <>
+        {kind === 'rewrite' && (
+          <BackBar label="Back to my draft report" onBack={() => setKind('draft')} />
+        )}
         <div className="mx-auto max-w-3xl px-6 py-12 space-y-8">
           <header>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -294,9 +328,22 @@ export default function WritingCoach() {
             </button>
           </div>
         </div>
+        </>
       )
     case 'wrapup':
-      return <WrapUp model={model} busy={busy} error={error} onFinish={finish} />
+      return (
+        <>
+          <BackBar
+            label="Back to my report"
+            onBack={() => {
+              setError(null)
+              setKind(report?.submissions.rewrite?.review ? 'rewrite' : 'draft')
+              setStep('report')
+            }}
+          />
+          <WrapUp model={model} busy={busy} error={error} onFinish={finish} />
+        </>
+      )
     case 'done': {
       const d = report?.submissions.draft?.review
       const r = report?.submissions.rewrite?.review
