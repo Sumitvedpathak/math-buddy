@@ -13,7 +13,7 @@ export default function ConfirmStep({ images, transcript, onConfirm, busy, error
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ Check the text</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-ink">Did we read your writing correctly?</h1>
         <p className="mt-3 max-w-2xl text-ink-soft">
-          The text is exactly what we read, mistakes and all. Fix only the words we got wrong. Do not add anything new.
+          The text is exactly what we read, mistakes and all. Fix only the words we got wrong. Do not fix your own spelling, capitals or punctuation here, because your review will point those out. Do not add anything new. If we were not sure about a capital letter we put [?] after the word; you can leave it.
           {illegible > 0 && ` Words we could not read are marked [illegible]. There ${illegible === 1 ? 'is 1' : `are ${illegible}`}.`}
         </p>
       </header>

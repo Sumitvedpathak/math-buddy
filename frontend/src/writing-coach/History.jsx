@@ -36,6 +36,17 @@ function Overview({ overview }) {
           Weakest first. <strong className="text-ink">{STEP_BY_KEY[steps[0].step].label}</strong> needs the most work.
         </p>
       </div>
+      {overview.top_errors?.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-ink">Your most common writing mistakes</h3>
+          <ul className="mt-2 list-disc pl-5 text-ink-soft">
+            {overview.top_errors.map((e) => <li key={e.category}>{e.label}: {e.count} {e.count === 1 ? 'time' : 'times'}</li>)}
+          </ul>
+          {overview.conventions_average != null && (
+            <p className="mt-2 text-sm text-ink-soft">Your average conventions score is {overview.conventions_average} out of 2.</p>
+          )}
+        </div>
+      )}
       <ul className="list-disc pl-5 text-ink-soft space-y-1">
         {overview.sessions_with_missed_parts > 0 && (
           <li>You skipped part of the question in {overview.sessions_with_missed_parts} of your last {recent} sessions.</li>

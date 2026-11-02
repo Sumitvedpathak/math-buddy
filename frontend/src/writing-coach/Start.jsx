@@ -10,6 +10,7 @@ export const CRITERIA = [
   'Extend (Level 4): I will add one deeper idea: another group\'s perspective, a link to today, short- versus long-term effects, or the author\'s choice and why.',
   'I will use at least 2 subject words (for example Loyalist, seigneury, treaty, theme, symbol).',
   'I will aim for 150 to 250 words and check my work against this list before I submit.',
+  'Before I take my photo I will reread my paper once for COPS (Capitals, Overall, Punctuation, Spelling) and fix mistakes in pen.',
 ]
 
 export const btn =
@@ -44,6 +45,19 @@ export default function Start({ reminder, onBegin, onHistory, busy }) {
           </p>
         )}
       </section>
+
+      {reminder.top_errors?.length > 0 && (
+        <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Your top errors">
+          <h2 className="font-display text-xl font-semibold text-ink">Watch for these today</h2>
+          <ul className="mt-3 list-disc pl-5 text-ink-soft">
+            {reminder.top_errors.map((e) => (
+              <li key={e.category}>
+                In your last {reminder.top_errors_sessions} practices you missed <strong className="text-ink">{e.label}</strong> {e.count} times.
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {reminder.rubric_override && (
         <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Teacher success criteria">

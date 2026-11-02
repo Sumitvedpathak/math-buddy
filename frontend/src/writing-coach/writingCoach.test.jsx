@@ -5,6 +5,7 @@ import { SessionContext } from '../context/SessionContext'
 import WritingCoach, { stepFromReport } from './WritingCoach'
 import Report from './Report'
 import Start, { CRITERIA } from './Start'
+import EditPass, { COPS } from './EditPass'
 import WritingCoachPanel from './WritingCoachPanel'
 import { colourSegments, missingSteps } from './colours'
 import { wc, wcParent } from './wcApi'
@@ -14,7 +15,7 @@ vi.mock('./wcApi', () => ({
     reminder: vi.fn(), createSession: vi.fn(), decode: vi.fn(), report: vi.fn(),
     listSessions: vi.fn(), overview: vi.fn(),
   },
-  wcParent: { sessions: vi.fn(), getSettings: vi.fn(), putSettings: vi.fn() },
+  wcParent: { sessions: vi.fn(), conventions: vi.fn(), getSettings: vi.fn(), putSettings: vi.fn() },
 }))
 
 const ITEM = {
@@ -43,7 +44,15 @@ const REVIEW = {
     { sentence: 'Governor Lawrence ordered it in 1755.', tag: 'cite' },
   ],
   strengths: ['Clear start.'], nextSteps: ['Add a second date.'], pushQuestion: 'What would a Mi\'kmaw family say?',
-  sentenceUpgrade: { original: 'It was bad.', better: 'It tore families apart.' }, conventions: [],
+  sentenceUpgrade: { original: 'It was bad.', better: 'It tore families apart.' },
+  conventions: {
+    score: 1, levelAdjustment: -1,
+    errors: [
+      { original: 'grand river', correction: 'Grand River', type: 'capitalization', category: 'capital_place', rule: 'Names of places need capitals' },
+      { original: 'haudenosaunee', correction: 'Haudenosaunee', type: 'capitalization', category: 'capital_group', rule: 'Names of nations need capitals' },
+    ],
+  },
+  contentLevel: '3', contentPercent: 75,
 }
 const TRANSCRIPT = 'The Acadians were deported. Governor Lawrence ordered it in 1755. It was bad.'
 const REPORT = {
@@ -218,7 +227,12 @@ describe('WritingCoach', () => {
     await user.click(await screen.findByRole('button', { name: 'Start writing' }))
     await screen.findByRole('timer')
     await user.click(screen.getByRole('button', { name: /take a photo/i }))
+    await screen.findByText(/Check your paper with COPS/)
+    for (const box of screen.getAllByRole('checkbox')) await user.click(box)
+    await user.click(screen.getByRole('button', { name: /take a photo/i }))
     await screen.findByText(/Photograph your answer/)
+    await user.click(screen.getByRole('button', { name: /Back/ }))
+    await screen.findByText(/Check your paper with COPS/)
     await user.click(screen.getByRole('button', { name: /Back/ }))
     await screen.findByRole('timer')
     await user.click(screen.getByRole('button', { name: /Back/ }))
@@ -247,8 +261,13 @@ describe('WritingCoach', () => {
 describe('WritingCoachPanel (parent view)', () => {
   it('shows only date, subject, question and the levels, plus settings', async () => {
     wcParent.sessions.mockResolvedValue([
-      { id: 's1', created_at: '2026-11-02T15:00:00Z', subject: 'history', question: 'Why did X?', draft: { level: '3-', percent: 72 }, rewrite: null },
+      { id: 's1', created_at: '2026-11-02T15:00:00Z', subject: 'history', question: 'Why did X?', draft: { level: '3-', percent: 72 }, rewrite: null,
+        corrections: [{ kind: 'draft', changes: [{ op: 'replace', before: 'Haldiman', after: 'Haldimand', suspect: true }] }] },
     ])
+    wcParent.conventions.mockResolvedValue({
+      trend: [{ date: '2026-11-02T15:00:00Z', subject: 'history', draft_score: 1, rewrite_score: 2, errors_flagged: 3, errors_fixed: 2 }],
+      top_errors: [{ category: 'capital_place', label: 'capitals on place names', count: 4 }],
+    })
     wcParent.getSettings.mockResolvedValue({ history_strand: 'A', focus_week: 1, rubric_override: null })
     wcParent.putSettings.mockResolvedValue({ history_strand: 'B', focus_week: 1, rubric_override: null })
     const user = userEvent.setup()
@@ -256,11 +275,78 @@ describe('WritingCoachPanel (parent view)', () => {
 
     expect(await screen.findByText('Why did X?')).toBeInTheDocument()
     expect(screen.getByText('3- (72%)')).toBeInTheDocument()
-    expect(screen.queryByText(/feedback|transcript/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/feedback/i)).not.toBeInTheDocument()
+    // conventions trend, most common mistakes, and what he changed while checking the text
+    expect(await screen.findByText(/Fixed 2 of 3 draft mistakes/)).toBeInTheDocument()
+    expect(screen.getByText('capitals on place names: 4')).toBeInTheDocument()
+    expect(screen.getByText(/He changed 1 word while checking the text/)).toBeInTheDocument()
+    expect(screen.getByText(/\u201cHaldiman\u201d \u2192 \u201cHaldimand\u201d/)).toBeInTheDocument()
+    expect(screen.getByText(/looks like a spelling fix/)).toBeInTheDocument()
 
     await user.selectOptions(await screen.findByLabelText(/History strand/), 'B')
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     await waitFor(() => expect(wcParent.putSettings).toHaveBeenCalledWith('tok', 'p1', expect.objectContaining({ history_strand: 'B' })))
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  })
+})
+
+describe('Conventions in the report', () => {
+  it('lists the mistakes with rules, and explains the level step-down', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    const section = screen.getByRole('region', { name: 'Conventions' })
+    expect(within(section).getByText(/Conventions score:/)).toHaveTextContent('1/2')
+    expect(within(section).getByText(/lowered your level by one step/)).toBeInTheDocument()
+    expect(within(section).getByText(/Your ideas earned Level 3, so your level is 3-/)).toBeInTheDocument()
+    expect(within(section).getByText('Fix these before you hand it in')).toBeInTheDocument()
+    expect(within(section).getByText('Grand River')).toBeInTheDocument()
+    expect(within(section).getByText('Names of places need capitals')).toBeInTheDocument()
+  })
+
+  it('comes after the improvement advice', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    const improve = screen.getByRole('region', { name: 'How to improve' })
+    const conv = screen.getByRole('region', { name: 'Conventions' })
+    expect(improve.compareDocumentPosition(conv) & window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows whether the draft mistakes were fixed in the rewrite', () => {
+    const fixed = [
+      { original: 'grand river', correction: 'Grand River', status: 'fixed' },
+      { original: 'haudenosaunee', correction: 'Haudenosaunee', status: 'still_there' },
+    ]
+    const rewrite = { ...REPORT.submissions.draft, id: 'r1', fixed_errors: fixed, review: { ...REVIEW, conventions: { score: 2, errors: [], levelAdjustment: 0 } } }
+    render(<Report report={{ ...REPORT, submissions: { ...REPORT.submissions, rewrite } }} kind="rewrite" />)
+    const section = screen.getByRole('region', { name: 'Fixed errors' })
+    expect(within(section).getByText('You fixed 1 of 2.')).toBeInTheDocument()
+    expect(within(section).getByText('Fixed')).toBeInTheDocument()
+    expect(within(section).getByText('Still there')).toBeInTheDocument()
+  })
+
+  it('copes with older reviews that have no conventions block', () => {
+    const old = { ...REVIEW, conventions: [] }
+    render(<Report report={{ ...REPORT, submissions: { draft: { ...REPORT.submissions.draft, review: old } } }} kind="draft" />)
+    expect(screen.queryByRole('region', { name: 'Conventions' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Personal error tracker and edit pass', () => {
+  it('shows his recurring errors on the reminder screen', () => {
+    render(<Start reminder={{ ...REMINDER, top_errors_sessions: 5, top_errors: [{ category: 'capital_place', label: 'capitals on place names', count: 4 }] }} onBegin={() => {}} onHistory={() => {}} />)
+    const box = screen.getByRole('region', { name: 'Your top errors' })
+    expect(box).toHaveTextContent('In your last 5 practices you missed capitals on place names 4 times.')
+  })
+
+  it('requires COPS to be ticked before the photo', async () => {
+    const onDone = vi.fn()
+    const user = userEvent.setup()
+    render(<EditPass topErrors={[{ category: 'capital_place', label: 'capitals on place names', count: 4 }]} onDone={onDone} />)
+    const go = screen.getByRole('button', { name: /Take a photo/ })
+    expect(go).toBeDisabled()
+    expect(screen.getByText('capitals on place names')).toBeInTheDocument()
+    const boxes = screen.getAllByRole('checkbox')
+    expect(boxes).toHaveLength(COPS.length)
+    for (const b of boxes) await user.click(b)
+    await user.click(go)
+    expect(onDone).toHaveBeenCalled()
   })
 })

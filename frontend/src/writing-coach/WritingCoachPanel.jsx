@@ -66,13 +66,64 @@ function Settings({ token, profileId }) {
   )
 }
 
-/** Parent view: which tests were done and the level the Reviewer gave. Nothing more. */
+function ConventionsSummary({ data }) {
+  if (!data || data.trend.length === 0) return null
+  return (
+    <div className="mt-6 space-y-4" aria-label="Conventions">
+      <h3 className="font-display text-lg font-semibold text-ink">Spelling, grammar and punctuation</h3>
+      <div>
+        <p className="text-sm text-muted-foreground">Conventions score per practice (out of 2), oldest first</p>
+        <ul className="mt-2 flex flex-wrap gap-3 list-none p-0">
+          {data.trend.map((t) => (
+            <li key={t.date} className="rounded-md bg-muted px-3 py-2 text-sm text-ink-soft">
+              <span className="block font-mono text-xs text-muted-foreground">{dateFmt.format(new Date(t.date))}</span>
+              Draft <strong className="text-ink">{t.draft_score ?? '—'}</strong>
+              {t.rewrite_score != null && <> · Rewrite <strong className="text-ink">{t.rewrite_score}</strong></>}
+              {t.errors_flagged > 0 && <span className="block">Fixed {t.errors_fixed} of {t.errors_flagged} draft mistakes</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {data.top_errors.length > 0 && (
+        <div>
+          <p className="text-sm text-muted-foreground">Most common mistakes</p>
+          <ul className="mt-2 list-disc pl-5 text-ink-soft">
+            {data.top_errors.map((e) => <li key={e.category}>{e.label}: {e.count}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Corrections({ corrections }) {
+  const changes = corrections.flatMap((c) => c.changes.map((ch) => ({ ...ch, kind: c.kind })))
+  if (changes.length === 0) return null
+  return (
+    <details className="mt-1 text-xs">
+      <summary className="cursor-pointer text-muted-foreground">
+        He changed {changes.length} {changes.length === 1 ? 'word' : 'words'} while checking the text
+      </summary>
+      <ul className="mt-1 list-none p-0">
+        {changes.map((ch, i) => (
+          <li key={i} className="text-ink-soft">
+            {ch.kind}: “{ch.before}” → “{ch.after}”{ch.suspect && <span className="ml-1 text-destructive">(looks like a spelling fix)</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+/** Parent view: tests done, levels, conventions trend and common mistakes, and any text he changed. */
 export default function WritingCoachPanel({ token, profileId }) {
   const [rows, setRows] = useState(null)
+  const [conventions, setConventions] = useState(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     wcParent.sessions(token, profileId).then(setRows).catch(() => setError(true))
+    wcParent.conventions(token, profileId).then(setConventions).catch(() => setConventions(null))
   }, [token, profileId])
 
   return (
@@ -99,7 +150,10 @@ export default function WritingCoachPanel({ token, profileId }) {
                   <tr key={r.id} className="border-t border-border align-top">
                     <td className="py-2 pr-4 whitespace-nowrap">{dateFmt.format(new Date(r.created_at))}</td>
                     <td className="py-2 pr-4">{SUBJECT_LABEL[r.subject]}</td>
-                    <td className="py-2 pr-4">{r.question}</td>
+                    <td className="py-2 pr-4">
+                      {r.question}
+                      {r.corrections?.length > 0 && <Corrections corrections={r.corrections} />}
+                    </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-ink">{levelText(r.draft)}</td>
                     <td className="py-2 whitespace-nowrap text-ink">{levelText(r.rewrite)}</td>
                   </tr>
@@ -109,6 +163,7 @@ export default function WritingCoachPanel({ token, profileId }) {
           </div>
         )}
       </div>
+      <ConventionsSummary data={conventions} />
       <Settings token={token} profileId={profileId} />
     </section>
   )

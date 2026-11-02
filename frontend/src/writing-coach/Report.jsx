@@ -41,6 +41,68 @@ function ResultCard({ title, review }) {
   )
 }
 
+const STATUS_TEXT = {
+  fixed: { mark: '✓', text: 'Fixed', cls: 'text-accent' },
+  still_there: { mark: '✗', text: 'Still there', cls: 'text-destructive' },
+  rewritten: { mark: '~', text: 'Rewritten, so check it by eye', cls: 'text-ink-soft' },
+}
+
+/** Conventions come after elaboration and evidence: "Fix these before you hand it in". */
+function ConventionsSection({ conventions, contentLevel, level }) {
+  if (!conventions || Array.isArray(conventions) || conventions.score === undefined) return null
+  const { score, errors } = conventions
+  const effect = { 2: 'No change to your level.', 1: 'This lowered your level by one step.', 0: 'This lowered your level by two steps.' }[score]
+  return (
+    <Section title="Spelling, grammar and punctuation" label="Conventions">
+      <p className="text-ink">
+        Conventions score: <strong>{score}/2</strong>. {effect}
+        {contentLevel && contentLevel !== level && ` Your ideas earned Level ${contentLevel}, so your level is ${level}.`}
+      </p>
+      {errors.length === 0 ? (
+        <p>No mistakes found. Well done.</p>
+      ) : (
+        <>
+          <h3 className="font-semibold text-ink">Fix these before you hand it in</h3>
+          <ul className="space-y-2 list-none p-0">
+            {errors.map((e, i) => (
+              <li key={`${e.original}-${i}`} className="rounded-xl bg-muted p-3">
+                <p className="text-ink">
+                  <span className="line-through decoration-destructive">{e.original}</span>
+                  {' → '}
+                  <strong>{e.correction}</strong>
+                </p>
+                {e.rule && <p className="text-sm">{e.rule}</p>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Section>
+  )
+}
+
+function FixedErrors({ fixed }) {
+  if (!fixed || fixed.length === 0) return null
+  const done = fixed.filter((f) => f.status === 'fixed').length
+  return (
+    <Section title="Did you fix your draft mistakes?" label="Fixed errors">
+      <p className="text-ink">You fixed {done} of {fixed.length}.</p>
+      <ul className="space-y-2 list-none p-0">
+        {fixed.map((f, i) => {
+          const s = STATUS_TEXT[f.status]
+          return (
+            <li key={`${f.original}-${i}`} className="flex flex-wrap items-baseline gap-2">
+              <span className={`font-mono ${s.cls}`} aria-hidden="true">{s.mark}</span>
+              <span className="text-ink">{f.original} → {f.correction}</span>
+              <span className={`text-sm ${s.cls}`}>{s.text}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
+  )
+}
+
 function nextLevelHint(percent) {
   if (percent >= 80) return 'You are at Level 4. Keep adding depth and new connections.'
   if (percent >= 70) return `You are at Level 3. ${80 - percent} more percent reaches Level 4: add a deeper idea or another point of view.`
@@ -213,13 +275,10 @@ export default function Report({ report, kind }) {
             <p className="mt-2"><span className="font-mono text-xs uppercase text-muted-foreground">A stronger version</span><br /><span className="text-ink">{review.sentenceUpgrade.better}</span></p>
           </div>
         )}
-        {review.conventions.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-ink">Spelling and grammar (does not change your level)</h3>
-            <ul className="list-disc pl-5">{review.conventions.map((c) => <li key={c}>{c}</li>)}</ul>
-          </div>
-        )}
       </Section>
+
+      <ConventionsSection conventions={review.conventions} contentLevel={review.contentLevel} level={review.level} />
+      {kind === 'rewrite' && <FixedErrors fixed={sub.fixed_errors} />}
 
       <Section title="Your habits">
         <ul className="list-disc pl-5">

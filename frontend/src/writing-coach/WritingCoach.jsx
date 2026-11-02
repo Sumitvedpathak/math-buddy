@@ -5,6 +5,7 @@ import Start, { btn, btnGhost } from './Start'
 import QuestionDecode from './QuestionDecode'
 import WriteStep from './WriteStep'
 import UploadStep from './UploadStep'
+import EditPass from './EditPass'
 import ConfirmStep from './ConfirmStep'
 import Report from './Report'
 import WrapUp from './WrapUp'
@@ -270,14 +271,21 @@ export default function WritingCoach() {
             kind={kind}
             minutes={kind === 'rewrite' ? REWRITE_MINUTES : DRAFT_MINUTES}
             feedback={kind === 'rewrite' ? feedback : null}
-            onDone={() => setStep('upload')}
+            onDone={() => setStep('edit')}
           />
+        </>
+      )
+    case 'edit':
+      return (
+        <>
+          <BackBar onBack={() => setStep('write')} />
+          <EditPass topErrors={reminder?.top_errors} onDone={() => setStep('upload')} />
         </>
       )
     case 'upload':
       return (
         <>
-          <BackBar onBack={() => { setError(null); setStep('write') }} />
+          <BackBar onBack={() => { setError(null); setStep('edit') }} />
           <UploadStep
             title={kind === 'rewrite' ? 'Photograph your rewrite' : 'Photograph your answer'}
             busy={busy}
