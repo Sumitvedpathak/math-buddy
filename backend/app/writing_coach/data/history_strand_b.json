@@ -1,0 +1,101 @@
+{
+  "strand": "B",
+  "title": "Canada, 1800-1850: Forming a Society",
+  "status": "DRAFT - written from general knowledge, needs parent review before it is trusted. The Generator may only use the facts listed here.",
+  "concepts": ["Historical Significance", "Cause and Consequence", "Continuity and Change", "Historical Perspective"],
+  "topics": [
+    {
+      "id": "b-war-of-1812",
+      "title": "The War of 1812",
+      "key_facts": [
+        "The United States declared war on Britain in June 1812. Much of the fighting took place in and near Upper Canada and Lower Canada.",
+        "Tecumseh, a Shawnee leader, built an alliance of First Nations to defend their lands and fought alongside the British. He was killed at the Battle of the Thames in 1813.",
+        "General Isaac Brock, the British commander in Upper Canada, was killed at the Battle of Queenston Heights in October 1812.",
+        "In 1813 Charles de Salaberry led a small force of Canadiens and Mohawk warriors that stopped a much larger American army at Chateauguay.",
+        "Laura Secord is remembered for walking a long way in 1813 to warn the British of an American attack.",
+        "The Treaty of Ghent (December 1814) ended the war. Borders mostly stayed the same. First Nations allies did not gain the protected homeland they had fought for."
+      ],
+      "key_terms": ["Tecumseh", "Isaac Brock", "Treaty of Ghent", "militia", "alliance", "Queenston Heights"],
+      "perspectives": ["British soldiers and militia", "Tecumseh and First Nations allies", "American soldiers", "Settler families in Upper Canada"]
+    },
+    {
+      "id": "b-immigration-famine",
+      "title": "Immigration and the Irish Famine",
+      "key_facts": [
+        "In the early 1800s many people from Britain and Ireland came to British North America to find land and work.",
+        "The Irish potato famine of the mid-1840s killed or drove away huge numbers of people in Ireland. The worst year for arrivals in Canada was 1847.",
+        "Tens of thousands of Irish people arrived in 1847, many sick with typhus fever after long voyages in crowded ships.",
+        "The quarantine station at Grosse-Ile near Quebec City was overwhelmed. Thousands of people died there and are buried in the island's graves.",
+        "Newcomers worked clearing land, building canals and roads, and in towns. Settlers took up land that First Nations had lived on, and this changed the communities that were already there."
+      ],
+      "key_terms": ["immigrant", "famine", "typhus", "Grosse-Ile", "quarantine", "settler"],
+      "perspectives": ["An Irish family fleeing the famine", "Canadian officials and doctors at Grosse-Ile", "Established settlers", "First Nations whose land was being settled"]
+    },
+    {
+      "id": "b-rebellions-1837",
+      "title": "The Rebellions of 1837-1838 and the Durham Report",
+      "key_facts": [
+        "In both Upper Canada and Lower Canada, many people were unhappy because small groups of appointed officials held most of the power. In Upper Canada this group was called the Family Compact. In Lower Canada it was called the Chateau Clique.",
+        "In Upper Canada, William Lyon Mackenzie led a rebellion in December 1837 that began near Montgomery's Tavern in Toronto. It was quickly defeated.",
+        "In Lower Canada, Louis-Joseph Papineau and the Patriotes demanded more power for the elected assembly. Fighting broke out in 1837 and 1838.",
+        "Britain sent Lord Durham to report on the problems. His 1839 report recommended joining the two colonies and giving elected governments more control (responsible government).",
+        "The Act of Union (1840) joined Upper and Lower Canada into the Province of Canada."
+      ],
+      "key_terms": ["rebellion", "Family Compact", "Patriotes", "Durham Report", "Act of Union", "assembly"],
+      "perspectives": ["Reformers such as William Lyon Mackenzie", "The Family Compact", "French-speaking Patriotes", "British officials such as Lord Durham"]
+    },
+    {
+      "id": "b-responsible-government",
+      "title": "Responsible government (1840s)",
+      "key_facts": [
+        "Responsible government means the governor must act on the advice of ministers who have the support of the elected assembly.",
+        "Reformers Robert Baldwin (from Upper Canada) and Louis-Hippolyte LaFontaine (from Lower Canada) worked together in the Province of Canada.",
+        "In early 1848 Nova Scotia became the first colony in British North America to achieve responsible government, with Joseph Howe a key leader.",
+        "The Province of Canada achieved it in 1848, and in 1849 Governor General Lord Elgin signed the Rebellion Losses Bill even though many Conservatives opposed it.",
+        "The change meant elected representatives, not the governor, held real power over most of the colony's decisions."
+      ],
+      "key_terms": ["responsible government", "Baldwin", "LaFontaine", "Joseph Howe", "Lord Elgin", "elected assembly"],
+      "perspectives": ["Reformers such as Baldwin and LaFontaine", "Conservatives who opposed change", "The British governor", "Women, Indigenous people and many others who could not yet vote"]
+    },
+    {
+      "id": "b-underground-railroad",
+      "title": "Black communities and the Underground Railroad",
+      "key_facts": [
+        "In 1793 Upper Canada passed an Act to limit slavery, which stopped new enslaved people from being brought in and set a slow path toward ending it.",
+        "Slavery was abolished across most of the British Empire in 1834.",
+        "The Underground Railroad was a secret network of people and safe places that helped enslaved people escape from the United States to freedom, often to Upper Canada. It was not a real railroad.",
+        "After the US Fugitive Slave Act of 1850 even more people came to Canada.",
+        "Freedom seekers and free Black people built communities such as Buxton (the Elgin Settlement, founded 1849). Josiah Henson and Harriet Tubman are among the well-known people linked to the Underground Railroad.",
+        "Black Canadians still faced racism, including unequal schools and discrimination in jobs."
+      ],
+      "key_terms": ["Underground Railroad", "abolition", "freedom seeker", "Buxton", "discrimination", "enslaved"],
+      "perspectives": ["A freedom seeker arriving from the United States", "Black community builders", "Abolitionists", "Settlers who held racist views"]
+    },
+    {
+      "id": "b-robinson-treaties",
+      "title": "The Robinson Treaties (1850) and treaty-making",
+      "key_facts": [
+        "In 1850 William Benjamin Robinson, a government negotiator, made two treaties with Anishinaabe (Ojibwe) leaders: the Robinson-Superior Treaty and the Robinson-Huron Treaty. They covered land along the north shores of Lake Superior and Lake Huron.",
+        "The talks followed pressure from mining companies and an incident at Mica Bay in 1849, where Anishinaabe people, including Chief Shingwaukonse, protested mining on their land.",
+        "In the treaties the First Nations agreed to share their land. In return they were promised payments called annuities, reserves, and the right to keep hunting and fishing on the land.",
+        "The treaties said the annuity could rise if the land earned enough money. For many years this was not honoured, and First Nations took the Crown to court over it.",
+        "The Anishinaabe understood treaties as agreements to share the land and to be good neighbours, which may differ from how the government understood them."
+      ],
+      "key_terms": ["Robinson Treaties", "annuity", "reserve", "Anishinaabe", "treaty rights", "Shingwaukonse"],
+      "perspectives": ["Anishinaabe leaders", "Government negotiators", "Mining companies", "Settlers moving north"]
+    },
+    {
+      "id": "b-canals-economy",
+      "title": "Canals, timber and trade in the early 1800s",
+      "key_facts": [
+        "The Welland Canal, which lets ships get past Niagara Falls, opened in 1829.",
+        "The Rideau Canal, built between 1826 and 1832 under Lieutenant-Colonel John By, connected the Ottawa River to Lake Ontario. It was built to give the British a safe military route away from the American border. Many labourers, including Irish workers and French-Canadian workers, died of disease and accidents.",
+        "Timber was a major export. Squared logs were floated down rivers such as the Ottawa and shipped to Britain.",
+        "Farming grew in Upper Canada, and wheat became an important export.",
+        "Roads and canals made it easier to bring settlers in and to move goods out."
+      ],
+      "key_terms": ["canal", "export", "timber trade", "Welland Canal", "Rideau Canal", "labourer"],
+      "perspectives": ["Canal labourers", "Lieutenant-Colonel By and the military", "Timber merchants", "First Nations whose land and rivers were being changed"]
+    }
+  ]
+}

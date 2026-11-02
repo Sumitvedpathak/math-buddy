@@ -1,0 +1,14 @@
+{
+  "status": "Language question types. Passages are generated as short ORIGINAL texts; no copyrighted passages.",
+  "types": [
+    {"id": "character-change", "kind": "novel", "title": "How a character changes", "guidance": "Ask how a character changes from the beginning to the end, using at least two moments."},
+    {"id": "theme", "kind": "novel", "title": "Theme as a full sentence", "guidance": "Ask the student to state a theme as a full sentence (not one word) and prove it."},
+    {"id": "conflict", "kind": "novel", "title": "Conflict", "guidance": "Ask about the main conflict (internal or external) and how it drives the plot."},
+    {"id": "symbol-craft", "kind": "novel", "title": "Symbol, foreshadowing or author's craft", "guidance": "Ask what a symbol or foreshadowing hint suggests, and why the author made that choice."},
+    {"id": "point-of-view", "kind": "novel", "title": "Point of view and missing voices", "guidance": "Ask how the story would change from another character's view, or whose voice is missing."},
+    {"id": "evaluate-decision", "kind": "novel", "title": "Evaluate a decision", "guidance": "Ask whether a character made a good decision, with reasons and consequences."},
+    {"id": "text-to-world", "kind": "novel", "title": "Text-to-world connection", "guidance": "Ask how an idea in the text connects to something in the real world today."},
+    {"id": "poetry", "kind": "poem", "title": "Poetry: imagery, mood, personification", "guidance": "Provide a short original poem (8-12 lines). Ask about imagery, mood or personification."},
+    {"id": "media-persuasion", "kind": "media", "title": "Media literacy: persuasive techniques", "guidance": "Provide a short original advertisement or news item. Ask about persuasive techniques, credibility, or whose voice is missing."}
+  ]
+}

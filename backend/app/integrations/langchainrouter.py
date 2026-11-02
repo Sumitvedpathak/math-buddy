@@ -24,14 +24,16 @@ BUSY_MESSAGE = "The AI helper is busy right now. Please try again in a moment."
 FAILED_MESSAGE = "The AI helper ran into a problem. Please try again."
 
 
-def _get_model():
-    """Get the LangChain Router model."""
+def _get_model(model: str | None = None, temperature: float | None = None):
+    """Get the LangChain Router model. `model`/`temperature` override the env defaults."""
+    kwargs = {} if temperature is None else {"temperature": temperature}
     return ChatOpenAI(
-        model=OPENROUTER_MODEL,
+        model=model or OPENROUTER_MODEL,
         api_key=OPENROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
         max_retries=MAX_RETRIES,
-        timeout=REQUEST_TIMEOUT_S)
+        timeout=REQUEST_TIMEOUT_S,
+        **kwargs)
 
 def _filter_images(prompt: str, images: list[str] | None) -> list[str]:
     """Filter the images to be sent to the LangChain Router model."""
@@ -66,21 +68,25 @@ def _parse_json(content) -> dict:
     return json.loads(text)
 
 
-async def call_llm(prompt: str, images: list[str] | None = None) -> dict:
-    """Call the LangChain Router model.
+async def call_llm_with_usage(
+    prompt: str,
+    images: list[str] | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+) -> tuple[dict, dict]:
+    """Like `call_llm`, but with a per-call model/temperature and token usage.
 
-    Raises:
-        LLMServiceError: the call failed (after retries) — rate limit, timeout, provider error.
-        ValueError (json.JSONDecodeError): the model replied, but not with valid JSON.
+    Returns (parsed JSON, {"model", "input_tokens", "output_tokens"}).
     """
-    model = _get_model()
+    llm = _get_model(model, temperature)
 
     if images:
         messages = _filter_images(prompt, images)
     else:
         messages = [{"role": "user", "content": prompt}]
     try:
-        response = await model.ainvoke(messages, response_format={"type": "json_object"})
+        response = await llm.ainvoke(messages, response_format={"type": "json_object"})
     except Exception as exc:
         transient = _is_transient(exc)
         logger.error(
@@ -88,4 +94,21 @@ async def call_llm(prompt: str, images: list[str] | None = None) -> dict:
             extra={"exc_type": type(exc).__name__, "transient": transient, "error": str(exc)[:300]},
         )
         raise LLMServiceError(BUSY_MESSAGE if transient else FAILED_MESSAGE) from exc
-    return _parse_json(response.content)
+    meta = getattr(response, "usage_metadata", None) or {}
+    usage = {
+        "model": model or OPENROUTER_MODEL,
+        "input_tokens": meta.get("input_tokens", 0),
+        "output_tokens": meta.get("output_tokens", 0),
+    }
+    return _parse_json(response.content), usage
+
+
+async def call_llm(prompt: str, images: list[str] | None = None) -> dict:
+    """Call the LangChain Router model.
+
+    Raises:
+        LLMServiceError: the call failed (after retries) — rate limit, timeout, provider error.
+        ValueError (json.JSONDecodeError): the model replied, but not with valid JSON.
+    """
+    result, _usage = await call_llm_with_usage(prompt, images)
+    return result

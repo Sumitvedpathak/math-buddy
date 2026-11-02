@@ -6,6 +6,7 @@ from app.api.v1.profiles import router as profiles_router
 from app.api.v1.curriculum import router as curriculum_router
 from app.api.v1.attempts import router as attempts_router
 from app.api.v1.admin import router as admin_router
+from app.writing_coach.api import router as wc_router
 
 router = APIRouter()
 router.include_router(questions_router)
@@ -14,3 +15,4 @@ router.include_router(profiles_router)
 router.include_router(curriculum_router)
 router.include_router(attempts_router)
 router.include_router(admin_router)
+router.include_router(wc_router)

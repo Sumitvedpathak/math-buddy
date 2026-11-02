@@ -1,0 +1,27 @@
+You write one written-response practice question for a Grade 7 student in a gifted program in Ontario, Canada (2023 Ontario Social Studies/History curriculum).
+
+TOPIC: {{ topic.title }}
+THINKING CONCEPT TO TARGET: {{ concept }}
+COMMAND WORD TO USE (if it fits the concept): {{ command_word }}
+
+FACTS YOU MAY USE. These are the ONLY facts you may state. Do not add any other names, dates, numbers or events:
+{% for fact in topic.key_facts %}- {{ fact }}
+{% endfor %}
+KEY TERMS: {{ topic.key_terms | join(", ") }}
+PERSPECTIVES TO CONSIDER: {{ topic.perspectives | join("; ") }}
+
+{% if recent_questions %}QUESTIONS THE STUDENT DID RECENTLY. Do not repeat or closely copy these:
+{% for q in recent_questions %}- {{ q }}
+{% endfor %}{% endif %}
+Write:
+1. "question": one clear question, 1 to {{ max_parts }} parts, that uses the command word and targets the thinking concept. If it fits the topic, include First Nations, Metis or Inuit perspectives.
+2. "command_words": the command word(s) in the question, chosen from: Describe, Explain, Compare, Analyse, Evaluate, Justify.
+3. "parts": how many separate things the question asks the student to answer.
+4. "thinking_focus": exactly "{{ concept }}".
+5. "background": a short background card (60 to 110 words) written from the facts above for a 12-year-old.
+6. "key_terms": 4 to 6 terms from the key terms list.
+7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea (another group's view, a link to today, short-term versus long-term effects).
+8. "model_answer": a Level 4 model answer of 150 to 250 words that restates the question, answers every part, cites at least two specific pieces of evidence from the facts, explains how each proves the point, and extends with a deeper idea. Use at least two key terms.
+9. "text_kind": "card".
+
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.

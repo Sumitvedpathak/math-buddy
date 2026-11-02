@@ -1,0 +1,145 @@
+{
+  "strand": "A",
+  "title": "New France and British North America, 1713-1800",
+  "status": "DRAFT - written from general knowledge, needs parent review before it is trusted. The Generator may only use the facts listed here.",
+  "concepts": ["Historical Significance", "Cause and Consequence", "Continuity and Change", "Historical Perspective"],
+  "topics": [
+    {
+      "id": "a-utrecht-acadians",
+      "title": "Treaty of Utrecht and the Acadians (1713)",
+      "key_facts": [
+        "The Treaty of Utrecht (1713) ended a European war. France gave Britain peninsular Acadia (renamed Nova Scotia), Newfoundland and the Hudson Bay territory.",
+        "France kept Ile Royale (Cape Breton Island) and Ile Saint-Jean (Prince Edward Island) and built the fortress of Louisbourg on Ile Royale.",
+        "Acadians were French-speaking Catholic farmers who had lived in the region for about a hundred years. They built dykes to turn salt marsh into farmland.",
+        "British governors wanted the Acadians to swear an unconditional oath of allegiance to the British Crown. Many refused, and they became known as the 'neutral French'.",
+        "The Mi'kmaw had lived in the region for thousands of years. They were allies and trading partners of the Acadians and the French, and they did not agree that France could give away their land."
+      ],
+      "key_terms": ["Acadian", "Treaty of Utrecht", "oath of allegiance", "neutral French", "Mi'kmaw", "dyke"],
+      "perspectives": ["Acadian farmers", "British governors", "Mi'kmaw communities", "French officials at Louisbourg"]
+    },
+    {
+      "id": "a-acadian-expulsion",
+      "title": "The Expulsion of the Acadians (1755)",
+      "key_facts": [
+        "In 1755 British officials, led by Governor Charles Lawrence, ordered the Acadians to be deported from Nova Scotia. This is often called the Great Upheaval or Le Grand Derangement.",
+        "The British had captured Fort Beausejour in June 1755, during rising tension with France before the Seven Years' War.",
+        "Thousands of Acadians, probably around ten thousand or more over several years, were forced onto ships. Families were often split up and sent to British colonies, Britain and France.",
+        "Their farms and villages were burned or given to settlers from New England, called Planters.",
+        "Many Acadians died from disease and hunger. Some escaped into the woods with Mi'kmaw help. Some later settled in Louisiana, where their descendants are called Cajuns.",
+        "Today Acadian culture is alive in the Maritimes. National Acadian Day is celebrated on August 15."
+      ],
+      "key_terms": ["Expulsion", "deportation", "Governor Lawrence", "Planters", "Fort Beausejour", "Cajun"],
+      "perspectives": ["Acadian families", "Governor Lawrence and British officials", "New England Planters", "Mi'kmaw allies"]
+    },
+    {
+      "id": "a-seven-years-war",
+      "title": "The Seven Years' War and the Plains of Abraham (1759)",
+      "key_facts": [
+        "The Seven Years' War (about 1756-1763) was fought between Britain and France, and the fighting spread to North America.",
+        "Britain captured the fortress of Louisbourg in 1758, which opened the St. Lawrence River.",
+        "On September 13, 1759, British forces led by General James Wolfe defeated the French under General Montcalm in a short battle on the Plains of Abraham outside Quebec City. Both generals died.",
+        "Montreal surrendered to the British in 1760.",
+        "Many First Nations were involved as allies, guides and warriors on both sides. Several nations, such as the Algonquin and Abenaki, allied with the French. The Haudenosaunee were divided, though many supported the British.",
+        "For the habitants of New France the war meant destroyed farms, shortages of food, and a change of ruler."
+      ],
+      "key_terms": ["Plains of Abraham", "General Wolfe", "General Montcalm", "siege", "capitulation", "ally"],
+      "perspectives": ["British soldiers and officials", "French and habitant families in Quebec", "First Nations allies on both sides"]
+    },
+    {
+      "id": "a-treaty-paris-1763",
+      "title": "The Treaty of Paris (1763)",
+      "key_facts": [
+        "The Treaty of Paris of 1763 ended the Seven Years' War.",
+        "France gave up almost all of New France, including Canada, to Britain. France kept the small islands of Saint-Pierre and Miquelon and some fishing rights off Newfoundland.",
+        "France gave the land west of the Mississippi River (Louisiana) to Spain.",
+        "People living in the territory became subjects of the British Crown. Questions about language, religion and law for the French-speaking Catholic majority had to be settled.",
+        "First Nations were not part of the treaty talks, even though the treaty handed over lands where they lived."
+      ],
+      "key_terms": ["Treaty of Paris", "cede", "New France", "British subject", "colony", "sovereignty"],
+      "perspectives": ["French-speaking Catholic habitants", "British officials and merchants", "First Nations who were not consulted"]
+    },
+    {
+      "id": "a-pontiac-proclamation",
+      "title": "Pontiac and the Royal Proclamation of 1763",
+      "key_facts": [
+        "After the French left, British forts and traders moved into the Great Lakes region. Many First Nations were unhappy about rising prices, fewer gifts and settlers taking land.",
+        "In 1763 Pontiac, an Odawa leader, helped organize an alliance of nations that attacked British forts, including Detroit. This is often called Pontiac's War.",
+        "On October 7, 1763 King George III issued the Royal Proclamation. It created the Province of Quebec and set aside land west of the Appalachian Mountains as Indian territory.",
+        "The Proclamation said that only the Crown could buy land from First Nations, which began a treaty process. Today it is seen as an important basis for Indigenous rights in Canada.",
+        "Many colonists in the Thirteen Colonies were angry because they wanted to settle the western land."
+      ],
+      "key_terms": ["Royal Proclamation", "Pontiac", "Odawa", "treaty", "Crown", "Indigenous rights"],
+      "perspectives": ["Pontiac and the First Nations alliance", "British officials in London", "Colonists who wanted western land", "French-speaking residents of the new Province of Quebec"]
+    },
+    {
+      "id": "a-quebec-act",
+      "title": "The Quebec Act (1774)",
+      "key_facts": [
+        "The Quebec Act of 1774 was passed by the British Parliament to govern the Province of Quebec.",
+        "It let Catholics hold public office and keep practising their religion, and it recognized the Catholic Church's right to collect tithes from Catholics.",
+        "It restored French civil law for private matters such as property, while British criminal law was kept. The seigneurial system was kept.",
+        "It made the province much larger, stretching to the Ohio Valley and the Great Lakes.",
+        "There was no elected assembly. A governor and an appointed council ruled.",
+        "Many in the Thirteen Colonies were angry about the Act, which added to tension before the American Revolution. Some Quebec merchants who spoke English also disliked it."
+      ],
+      "key_terms": ["Quebec Act", "civil law", "tithe", "Catholic", "seigneurial system", "assembly"],
+      "perspectives": ["French-speaking Catholic Canadiens", "English-speaking merchants", "Colonists in the Thirteen Colonies", "British governors such as Guy Carleton"]
+    },
+    {
+      "id": "a-loyalists",
+      "title": "The Loyalists (after 1776)",
+      "key_facts": [
+        "During and after the American Revolution (1775-1783), thousands of people who stayed loyal to Britain left the Thirteen Colonies for British North America. They are called Loyalists. A common estimate is about 40,000 to 50,000.",
+        "Loyalists came from many backgrounds. They included farmers, merchants, Black Loyalists and Haudenosaunee (Six Nations) Loyalists.",
+        "About 3,000 Black Loyalists, many of them people who had been enslaved and had been promised freedom for supporting Britain, went to Nova Scotia. They faced unequal land grants and discrimination. Birchtown was one of their communities.",
+        "In 1792 around 1,200 Black Loyalists left Nova Scotia for Sierra Leone in West Africa, looking for fairer treatment.",
+        "Joseph Brant (Thayendanegea) led many Haudenosaunee who had fought for the British. Their old homelands in New York were lost.",
+        "The Haldimand Proclamation of October 25, 1784 granted the Haudenosaunee land along the Grand River in what is now southern Ontario. The community is known today as Six Nations of the Grand River.",
+        "Loyalist settlement led to the creation of New Brunswick in 1784 and to the later creation of Upper Canada."
+      ],
+      "key_terms": ["Loyalist", "Black Loyalist", "Haudenosaunee", "Haldimand Proclamation", "Joseph Brant", "refugee"],
+      "perspectives": ["White Loyalist settlers", "Black Loyalists", "Haudenosaunee Loyalists", "Patriots in the new United States", "French-speaking residents who now had new neighbours"]
+    },
+    {
+      "id": "a-new-france-life",
+      "title": "Life in New France: the seigneurial system and habitants",
+      "key_facts": [
+        "In the seigneurial system the Crown gave large pieces of land (seigneuries) to seigneurs. Seigneurs divided the land into long, narrow farms, mostly along the St. Lawrence River so that families had water access.",
+        "Habitants were the farmers who rented these farms. They paid a yearly fee called the cens and had to do some work (corvee) for the seigneur. They used the seigneur's mill and paid for grinding grain.",
+        "The Catholic Church ran parishes, schools and hospitals, and farm families usually went to church every week.",
+        "Between about 1663 and 1673 around 800 young women called the Filles du roi were sent to New France to marry and settle. This helped the population grow.",
+        "Most of the colony's people lived near the St. Lawrence River. The fur trade, farming and fishing were the main parts of the economy.",
+        "First Nations people were trading partners, allies and neighbours of the colonists, and many of their ways of life were different from those of the habitants."
+      ],
+      "key_terms": ["seigneur", "seigneury", "habitant", "cens", "corvee", "Filles du roi"],
+      "perspectives": ["A habitant farmer", "A seigneur", "A woman among the Filles du roi", "A First Nations trading partner"]
+    },
+    {
+      "id": "a-fur-trade",
+      "title": "The fur trade, the HBC, the North West Company and the Metis",
+      "key_facts": [
+        "The Hudson's Bay Company (HBC) received a royal charter in 1670 and controlled Rupert's Land, the huge area drained by rivers flowing into Hudson Bay.",
+        "The North West Company, based in Montreal, was formed in 1779 by traders, many of them Scottish. It used canoe routes and voyageurs to reach far inland, and it competed with the HBC.",
+        "The two companies joined in 1821.",
+        "First Nations hunters, trappers, guides and traders were essential. They provided furs, food such as pemmican, canoes and knowledge of the land.",
+        "Many fur traders had children with First Nations women, especially Cree and Ojibwe women. Over time these families formed a distinct Metis culture, with its own language (Michif), music and way of life, which became centred on the Red River region.",
+        "Beaver pelts were highly valued in Europe, mainly for making hats."
+      ],
+      "key_terms": ["Hudson's Bay Company", "North West Company", "voyageur", "pemmican", "Metis", "Rupert's Land"],
+      "perspectives": ["An HBC trader", "A Nor'Wester trader", "A Cree or Ojibwe trapper and trader", "A Metis family"]
+    },
+    {
+      "id": "a-constitutional-act",
+      "title": "The Constitutional Act of 1791",
+      "key_facts": [
+        "The Constitutional Act of 1791 divided the Province of Quebec into two: Upper Canada (now southern Ontario) and Lower Canada (now southern Quebec).",
+        "Upper Canada was mostly settled by English-speaking Loyalists and used British laws. Lower Canada was mostly French-speaking and Catholic and kept French civil law and the seigneurial system.",
+        "Each colony had a lieutenant-governor, an appointed council, and an elected assembly. The elected assembly gave settlers a voice, but the governor and the appointed councils held most of the power.",
+        "John Graves Simcoe became the first Lieutenant-Governor of Upper Canada in 1791.",
+        "The division was meant to give each group a government that suited its law, language and customs."
+      ],
+      "key_terms": ["Constitutional Act", "Upper Canada", "Lower Canada", "assembly", "lieutenant-governor", "civil law"],
+      "perspectives": ["Loyalist settlers in Upper Canada", "French-speaking residents of Lower Canada", "British officials", "First Nations whose lands were being divided without their say"]
+    }
+  ]
+}

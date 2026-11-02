@@ -1,0 +1,17 @@
+A Grade 7 student in a gifted program in Ontario, Canada has brought a real question from school. Do NOT change the question. Prepare it for practice.
+
+THE STUDENT'S QUESTION (use it exactly as the "question"):
+{{ school_question }}
+
+Write:
+1. "question": the student's question, unchanged.
+2. "command_words": the command word(s) in the question, from: Describe, Explain, Compare, Analyse, Evaluate, Justify. Pick the closest one if the question does not use one.
+3. "parts": how many separate things the question asks the student to answer.
+4. "thinking_focus": a short phrase naming what the question tests (for example "Cause and Consequence" or "Theme").
+5. "background": 60 to 100 words telling the student what the question is really asking and what a strong answer needs to include. Do not state facts you are unsure about. If the question needs knowledge or a text you do not have, say so plainly.
+6. "key_terms": 4 to 6 subject words that would help in an answer.
+7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea.
+8. "model_answer": a 150 to 250 word example of the SHAPE of a Level 4 answer (restate, answer every part, two pieces of evidence, explain each, extend). Where the answer needs facts or quotes you do not have, write short placeholders in square brackets such as [a detail from your notes]. Never invent facts.
+9. "text_kind": "card".
+
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.
