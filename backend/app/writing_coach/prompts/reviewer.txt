@@ -11,6 +11,8 @@ THIS WEEK'S FOCUS SKILL: {{ focus }}
 {% if rubric_override %}THE TEACHER'S OWN RUBRIC / SUCCESS CRITERIA. Use these first, together with the levels below:
 {{ rubric_override }}
 {% endif %}
+HOW TO GIVE THE LEVEL: "level" and "percent" are for the CONTENT only: answering every part, ideas, evidence, explanation and thinking. Do NOT lower them for spelling, grammar, capitals or punctuation. The app lowers the level itself using the conventions score below.
+
 LEVELS (percent must match the level):
 - Level 1 (50-59%): limited. 1- is 50-52, 1 is 53-56, 1+ is 57-59. Below 50% is reported as 1-.
 - Level 2 (60-69%): correct but brief or general, little evidence. 2- is 60-62, 2 is 63-66, 2+ is 67-69.
@@ -28,8 +30,18 @@ Also write one sentence each for the four achievement chart categories: knowledg
 
 CHECKS:
 - Did the student answer EVERY part of the question? List any missed part in "missedParts" (empty list if none).
-- Do not lower marks for handwriting or spelling. Spelling and grammar are NOT content errors.
-{% if subject == "language" or subject == "school" %}- In "conventions" you may add at most 2 short notes about spelling, grammar or punctuation. This is a separate note and does not change the level. Leave it empty if there is nothing important.{% else %}- Leave "conventions" as an empty list.{% endif %}
+- Do not lower marks for handwriting itself (how neat it is).
+
+CONVENTIONS: check spelling, grammar, capitalization and punctuation in EVERY review, for every subject. Elaboration and evidence stay the main focus, but conventions are always marked. The transcript keeps the student's own spelling, capitals and punctuation exactly as written, so mark what you see.
+- List EVERY conventions error you find, up to 10, each with the correction, a "type", a short "rule", and a "category". Copy "original" EXACTLY as it appears in the answer (the shortest piece that shows the error, such as "grand river").
+- "type" is one of: capitalization, sentence, agreement, tense, punctuation, spelling, other.
+- "category" is exactly one of: capital_place, capital_person, capital_group, capital_document, capital_title, capital_sentence, fragment, run_on, agreement, tense, comma_intro, apostrophe, quotation, spelling, punctuation_other, other.
+- ALWAYS check capitals on proper nouns: people, places, nations and peoples (Haudenosaunee, Indigenous, First Nations), treaties and documents (Haldimand Proclamation), events, and book titles. Also sentence starts and the word "I".
+- Also check: complete sentences (no fragments or run-ons), subject-verb agreement, tense consistency, a comma after introductory words ("However,"), apostrophes, and quotation marks around quotes.
+- If the Reader marked a word with [?] (for example canada[?]), the capital is unclear from the handwriting. Do NOT count a capital error on that word.
+- The marker [illegible] is not an error.
+- Score conventions 0, 1 or 2: 2 = 0 to 2 minor errors; 1 = several errors that do not stop the meaning; 0 = frequent errors, or errors that make it hard to read.
+- Give "levelAdjustment" as 0 for score 2, -1 for score 1, -2 for score 0.
 - For novel questions the student may use their own class novel. Do not lower marks for not using the practice text.
 - Tag each sentence of the answer in "sentenceTags". Copy each sentence EXACTLY as it appears in the answer. Tag is one of: restate, answer, cite, explain, extend, other.
 
@@ -38,7 +50,7 @@ STUDENT'S ANSWER (confirmed transcript, exactly as the student wrote it):
 {{ transcript }}
 """
 
-Write to the student as "you", in short sentences a Grade 7 student understands. Never rewrite the whole answer. Give one "sentenceUpgrade": one of the student's real sentences and a better version.
+Write to the student as "you", in short sentences a Grade 7 student understands. Put elaboration and evidence feedback first. Conventions come after, as "Fix these before you hand it in". Never rewrite the whole answer. Give one "sentenceUpgrade": one of the student's real sentences and a better version.
 
 Return ONLY a JSON object with exactly these keys:
 {
@@ -52,5 +64,9 @@ Return ONLY a JSON object with exactly these keys:
   "nextSteps": ["", ""],
   "pushQuestion": "one question that lifts the answer to the next level",
   "sentenceUpgrade": {"original": "exact sentence", "better": "improved version"},
-  "conventions": []
+  "conventions": {
+    "score": 1,
+    "errors": [{"original": "grand river", "correction": "Grand River", "type": "capitalization", "category": "capital_place", "rule": "Names of places need capitals"}],
+    "levelAdjustment": -1
+  }
 }

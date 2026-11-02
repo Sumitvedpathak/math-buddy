@@ -272,6 +272,6 @@ async def review_answer(
         temperature=REVIEWER_TEMPERATURE,
     )
     review.drop_unmatched_tags(transcript)
-    if subject == "history":
-        review.conventions = []
+    review.drop_unmatched_conventions(transcript)
+    review.apply_conventions()
     return review, reviewer_model()

@@ -4,7 +4,8 @@ Copy the handwriting EXACTLY as written.
 
 Rules:
 - Do NOT correct spelling. If a word is misspelled, copy the misspelling.
-- Do NOT fix grammar, capital letters or punctuation. Copy them as written, including mistakes.
+- Do NOT fix grammar, capital letters or punctuation. Copy them as written, including mistakes. For example, if the student wrote "grand river" or "Haldiman", copy "grand river" and "Haldiman".
+- When the handwriting makes a capital letter ambiguous (c/C, s/S, o/O, w/W, k/K, p/P), copy the word with the letter you think is more likely and put [?] straight after that word, with no space, for example canada[?]. Use [?] only for a truly unclear capital, not for words that are simply misspelled.
 - Do NOT add, remove, reorder, summarise or improve anything.
 - Do NOT add headings, bullet points, bold, markdown or any formatting. Plain text only.
 - Keep line breaks and paragraph breaks where the writing has them.

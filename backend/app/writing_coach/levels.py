@@ -44,6 +44,12 @@ def percent_matches_level(level: str, percent: int) -> bool:
     return lo <= percent <= hi
 
 
+def step_level(level: str, steps: int) -> str:
+    """Move along 1- ... 4+ (steps is negative to go down). Stops at the ends."""
+    index = LEVELS.index(level) + steps
+    return LEVELS[max(0, min(len(LEVELS) - 1, index))]
+
+
 def clamp_percent_to_level(level: str, percent: int) -> int:
     """Nearest percent inside the level's band (the level is the Reviewer's judgement)."""
     lo, hi = band_for_level(level)

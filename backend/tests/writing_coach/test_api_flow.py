@@ -102,7 +102,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
     fixed = TRANSCRIPT.replace("deprted", "deported")
     c = await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})
     assert c.status_code == 200
-    assert c.json()["diff"] == [{"op": "replace", "before": "deprted", "after": "deported"}]
+    assert [(d["op"], d["before"], d["after"]) for d in c.json()["diff"]] == [("replace", "deprted", "deported")]
 
     # Reviewer sees only the confirmed text, at low temperature
     rv = await client.post(f"/api/v1/wc/submissions/{sub_id}/review", headers=h)
@@ -194,7 +194,7 @@ async def test_parent_routes_need_the_admin_token_and_show_levels_only(client, l
     assert (await client.get(f"/api/v1/wc/parent/sessions?profile_id={pid}")).status_code == 404
     rows = (await client.get(f"/api/v1/wc/parent/sessions?profile_id={pid}", headers={"X-Admin-Token": ADMIN_TOKEN})).json()
     assert rows[0]["draft"]["level"] == "3-" and rows[0]["question"]
-    assert set(rows[0]) == {"id", "created_at", "subject", "question", "status", "draft", "rewrite"}
+    assert set(rows[0]) == {"id", "created_at", "subject", "question", "status", "draft", "rewrite", "corrections"}
 
 
 async def test_parent_settings_change_what_the_student_gets(client, llm, admin_token):

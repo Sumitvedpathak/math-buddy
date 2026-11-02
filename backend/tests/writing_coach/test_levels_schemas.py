@@ -62,12 +62,9 @@ def test_review_rejects_unknown_level_and_bad_score():
         Review.model_validate(bad)
 
 
-def test_review_missed_parts_force_all_parts_false_and_conventions_capped():
-    r = Review.model_validate(
-        {**GOOD_REVIEW, "missedParts": ["part b"], "conventions": ["a", "b", "c"]}
-    )
+def test_review_missed_parts_force_all_parts_false():
+    r = Review.model_validate({**GOOD_REVIEW, "missedParts": ["part b"]})
     assert r.allPartsAnswered is False
-    assert r.conventions == ["a", "b"]
 
 
 def test_review_drops_tags_not_found_in_transcript():
@@ -92,7 +89,7 @@ def test_generated_item_validates_lengths():
 def test_correction_may_fix_misread_words():
     original = "The Acadians were deprted from Nova Scotia [illegible] 1755"
     diff = check_correction(original, "The Acadians were deported from Nova Scotia in 1755")
-    assert {"op": "replace", "before": "deprted", "after": "deported"} in diff
+    assert {"op": "replace", "before": "deprted", "after": "deported", "suspect": True} in diff
 
 
 def test_correction_rejects_added_content():

@@ -18,6 +18,7 @@ from app.integrations.langchainrouter import LLMServiceError
 from app.models.tables import Profile, WcReview, WcSession, WcSettings, WcSubmission
 from app.writing_coach import agents
 from app.writing_coach.schemas import (
+    CONVENTION_CATEGORIES,
     DecodeAnswer,
     ReadRequest,
     SessionCreate,
@@ -26,7 +27,12 @@ from app.writing_coach.schemas import (
     TranscriptUpdate,
     word_count,
 )
-from app.writing_coach.transcript import CorrectionTooLargeError, check_correction
+from app.writing_coach.transcript import (
+    CapitalChangeError,
+    CorrectionTooLargeError,
+    check_correction,
+    check_fixed_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +42,7 @@ parent_router = APIRouter(
 )
 
 RECENT_DAYS = 30
+ERROR_WINDOW = 5  # the personal error tracker looks at his latest 5 reviewed practices
 FOCUS_WEEKS = {
     1: ("Decode, Restate, Answer", "Circle the command word, count the parts, restate the question in your first sentence, and answer every part."),
     2: ("Cite and Explain", "Use two pieces of evidence, and after each one explain how it proves your point (two evidence-and-explain pairs)."),
@@ -200,6 +207,44 @@ def _summary_rows(sessions, subs_by_session, reviews) -> list[dict]:
     ]
 
 
+def _conventions_of(rev: WcReview) -> dict:
+    """The conventions block of a stored review ({} for older reviews that had a list)."""
+    block = rev.review.get("conventions")
+    return block if isinstance(block, dict) else {}
+
+
+def _draft_reviews(sessions, subs_by_session, reviews) -> list[tuple[WcSession, WcReview]]:
+    """(session, draft review) for every reviewed session, newest first."""
+    out = []
+    for s in sessions:
+        draft = subs_by_session.get(s.id, {}).get("draft")
+        rev = reviews.get(draft.id) if draft else None
+        if rev is not None:
+            out.append((s, rev))
+    return out
+
+
+def _error_counts(drafts: list[tuple[WcSession, WcReview]]) -> list[dict]:
+    """Conventions errors across these draft reviews, grouped by category, most common first."""
+    counts: dict[str, int] = {}
+    for _, rev in drafts:
+        for err in _conventions_of(rev).get("errors", []):
+            cat = err.get("category", "other")
+            counts[cat] = counts.get(cat, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])
+    return [
+        {"category": c, "label": CONVENTION_CATEGORIES.get(c, c), "count": n} for c, n in ranked
+    ]
+
+
+def _fixed_summary(draft_rev: WcReview | None, rewrite_sub: WcSubmission | None) -> list[dict] | None:
+    """Were the errors flagged in the draft fixed in the rewrite? None if it cannot be checked."""
+    if draft_rev is None or rewrite_sub is None:
+        return None
+    text = rewrite_sub.transcript_confirmed or rewrite_sub.transcript_original
+    return check_fixed_errors(_conventions_of(draft_rev).get("errors", []), text)
+
+
 def _llm_call_failed(exc: LLMServiceError) -> HTTPException:
     return HTTPException(status_code=503, detail=str(exc))
 
@@ -217,7 +262,12 @@ async def reminder(profile: ProfileDep, session: SessionDep):
     )
     subject, rest = suggested_subject()
     title, text = FOCUS_WEEKS[settings.focus_week]
+    sessions, subs, revs = await _list_rows(session, profile.id, limit=20)
+    recent = _draft_reviews(sessions, subs, revs)[:ERROR_WINDOW]
+    recurring = [e for e in _error_counts(recent) if e["count"] >= 2][:3]
     return {
+        "top_errors": recurring,
+        "top_errors_sessions": len(recent),
         "focus_week": settings.focus_week,
         "focus_title": title,
         "focus_text": text,
@@ -357,7 +407,7 @@ async def confirm_transcript(submission_id: uuid.UUID, data: TranscriptUpdate, p
         raise HTTPException(status_code=409, detail="This answer has already been reviewed.")
     try:
         diff = check_correction(sub.transcript_original, data.text)
-    except CorrectionTooLargeError as exc:
+    except (CorrectionTooLargeError, CapitalChangeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     sub.transcript_confirmed = data.text
     sub.diff = diff
@@ -432,6 +482,11 @@ async def session_report(session_id: uuid.UUID, profile: ProfileDep, session: Se
             "word_count": word_count(confirmed) if confirmed else None,
             "review": review_out(rev) if rev else None,
         }
+    draft_sub = subs.get("draft")
+    draft_rev = await review_for(session, draft_sub.id) if draft_sub else None
+    fixed = _fixed_summary(draft_rev, subs.get("rewrite"))
+    if fixed is not None and "rewrite" in submissions:
+        submissions["rewrite"]["fixed_errors"] = fixed
     return {
         "session": session_out(row, with_model_answer=await model_answer_unlocked(session, row.id)),
         "submissions": submissions,
@@ -477,7 +532,12 @@ async def overview(profile: ProfileDep, session: SessionDep):
             "draft_percent": r.percent, "rewrite_percent": rw.percent if rw else None,
         })
     words = [word_count(subs[s.id]["draft"].transcript_confirmed or "") for s, _, _ in recent]
+    drafts = _draft_reviews(sessions, subs, revs)[:ERROR_WINDOW]
+    conv_scores = [_conventions_of(r).get("score") for _, r in drafts]
+    conv_scores = [c for c in conv_scores if c is not None]
     return {
+        "top_errors": _error_counts(drafts)[:5],
+        "conventions_average": round(sum(conv_scores) / len(conv_scores), 2) if conv_scores else None,
         "session_count": len(reviewed),
         "recent_count": len(recent),
         "steps": step_avg,
@@ -502,7 +562,37 @@ async def parent_sessions(session: SessionDep, profile_id: Annotated[uuid.UUID, 
     """Only which tests were done and the level the Reviewer gave. No answers or feedback."""
     await _profile_or_404(session, profile_id)
     sessions, subs, revs = await _list_rows(session, profile_id)
-    return _summary_rows(sessions, subs, revs)
+    rows = _summary_rows(sessions, subs, revs)
+    for s, row in zip(sessions, rows):
+        # What he changed while checking the text, so a parent can see it (before -> after).
+        row["corrections"] = [
+            {"kind": kind, "changes": sub.diff}
+            for kind, sub in subs.get(s.id, {}).items()
+            if sub.diff
+        ]
+    return rows
+
+
+@parent_router.get("/conventions")
+async def parent_conventions(session: SessionDep, profile_id: Annotated[uuid.UUID, Query()]):
+    """Conventions score trend and the most common error types."""
+    await _profile_or_404(session, profile_id)
+    sessions, subs, revs = await _list_rows(session, profile_id)
+    drafts = _draft_reviews(sessions, subs, revs)
+    trend = []
+    for s, draft_rev in reversed(drafts):  # oldest first
+        rewrite_sub = subs[s.id].get("rewrite")
+        rewrite_rev = revs.get(rewrite_sub.id) if rewrite_sub else None
+        fixed = _fixed_summary(draft_rev, rewrite_sub) if rewrite_rev else None
+        trend.append({
+            "date": _iso(s.created_at),
+            "subject": s.subject,
+            "draft_score": _conventions_of(draft_rev).get("score"),
+            "rewrite_score": _conventions_of(rewrite_rev).get("score") if rewrite_rev else None,
+            "errors_flagged": len(fixed) if fixed is not None else None,
+            "errors_fixed": sum(1 for f in fixed if f["status"] == "fixed") if fixed is not None else None,
+        })
+    return {"trend": trend, "top_errors": _error_counts(drafts[:10])[:6]}
 
 
 def _settings_out(row: WcSettings) -> dict:

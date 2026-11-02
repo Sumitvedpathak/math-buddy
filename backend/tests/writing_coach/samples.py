@@ -33,5 +33,5 @@ GOOD_REVIEW = {
     "nextSteps": ["Add a second date.", "Say how it proves your point."],
     "pushQuestion": "How might a Mi'kmaw family see this?",
     "sentenceUpgrade": {"original": "It was bad.", "better": "It tore families apart."},
-    "conventions": [],
+    "conventions": {"score": 2, "errors": [], "levelAdjustment": 0},
 }
