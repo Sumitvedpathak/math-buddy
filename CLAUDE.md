@@ -21,6 +21,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Writing Coach (temporary; grade 7 son only)
+
+Written-answer practice for Language and History, marked against the Ontario achievement chart. **Photos are never stored**: the browser compresses/strips EXIF, the Reader agent reads them in memory, only the verbatim transcript (original + confirmed + word diff) and the review are saved.
+- **Backend**: `backend/app/writing_coach/` (self-contained). Three agents in `agents.py` (Generator, Reader, Reviewer): Jinja2 prompts in `writing_coach/prompts/`, pydantic schemas, one retry with a repair note. Per-agent models via env `WC_GENERATOR_MODEL`, `WC_READER_MODEL` (must accept images), `WC_REVIEWER_MODEL` (fall back to `MATH_BUDDY_OPENROUTER_MODEL`). Reader temp 0, Reviewer 0.1. `call_llm_with_usage` in `langchainrouter.py` adds per-call model/temperature + token counts (token counts are logged, never content).
+- **Facts**: History questions are written ONLY from `writing_coach/data/history_strand_{a,b}.json` (**drafts, need parent review**). Language types in `language_types.json`.
+- **API**: all under `/api/v1/wc/`. Student routes need header `X-Profile-Id` (a grade 7 profile). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, and settings: strand, teacher rubric, focus week).
+- **Tables** (`wc_settings`, `wc_sessions`, `wc_submissions`, `wc_reviews`, migration `0002`). Levels: `levels.py` (1- to 4+, percent bands; the Reviewer's level wins, percent is clamped into its band). A correction may fix misread words but not add content (`transcript.py`).
+- **Frontend**: `frontend/src/writing-coach/`, screen `writingCoach`, opened from a small link on the grade 7 setup screen (`PracticePage`). An unfinished session resumes via localStorage `mathBuddy.wc.activeSession`.
+- **Remove later**: delete `app/writing_coach`, `src/writing-coach`, `tests/writing_coach`; `alembic downgrade 0001`; remove the 4 table classes in `models/tables.py`, the router include in `api/v1/__init__.py`, the `writingCoach` case in `App.jsx`/typedef, the link in `PracticePage`, and the panel in `AdminApp`.
+- **Calibration** (real model, costs cents): `WC_CALIBRATE=1 pytest tests/writing_coach/test_calibration.py -s`. 2026-11-02: Haiku-class Reviewer scored sample L2/L3/L4 answers 50/68/75, Sonnet-class 54/74/88, so use a Sonnet-class Reviewer.
+
+---
+
 ## Quick Commands
 
 ### Backend (Python/FastAPI)

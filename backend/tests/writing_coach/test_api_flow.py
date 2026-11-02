@@ -80,7 +80,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
 
     # decode check
     d = (await client.post(f"/api/v1/wc/sessions/{sid}/decode", headers=h, json={
-        "command_words": ["Describe"], "parts": 1, "thinking_focus": "Cause and Consequence"})).json()
+        "command_words": ["Describe"], "parts": 1, "thinking_focus": s["item"]["thinking_focus"]})).json()
     assert d["command_words_correct"] is False and d["parts_correct"] and d["focus_correct"]
     assert d["missed_command_words"] == ["explain"]
 
