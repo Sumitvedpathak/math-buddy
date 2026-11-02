@@ -9,6 +9,7 @@ import PracticePage from './PracticePage'
 import Dashboard from './Dashboard'
 import Leaderboard from './Leaderboard'
 import About from './About'
+import WritingCoach from '../writing-coach/WritingCoach'
 import ErrorBanner from '../components/ErrorBanner'
 import AppHeader from '../components/AppHeader'
 import AppFooter from '../components/AppFooter'
@@ -44,6 +45,8 @@ export default function App() {
         return <Leaderboard />
       case 'about':
         return <About />
+      case 'writingCoach':
+        return <WritingCoach />
       default:
         return <HomeScreen />
     }
