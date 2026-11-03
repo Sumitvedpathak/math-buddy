@@ -80,6 +80,26 @@ function clearCachedIdentity() {
   }
 }
 
+const WRITING_COACH_OPEN_KEY = 'mathBuddy.wc.open'
+
+/** Per-tab, so a refresh stays on Writing Coach but a new visit opens on home. */
+function readWritingCoachOpen() {
+  try {
+    return window.sessionStorage.getItem(WRITING_COACH_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeWritingCoachOpen(open) {
+  try {
+    if (open) window.sessionStorage.setItem(WRITING_COACH_OPEN_KEY, '1')
+    else window.sessionStorage.removeItem(WRITING_COACH_OPEN_KEY)
+  } catch {
+    // storage unavailable: a refresh just goes back to home
+  }
+}
+
 /** @type {React.Context<any>} */
 export const SessionContext = createContext(null)
 
@@ -127,9 +147,13 @@ export function SessionProvider({ children }) {
 
   const [state, setState] = useState(() =>
     cachedIdentityRef.current
-      ? { ...INITIAL_STATE, profileStatus: 'loading' }
+      ? { ...INITIAL_STATE, profileStatus: 'loading', screen: readWritingCoachOpen() ? 'writingCoach' : 'home' }
       : { ...INITIAL_STATE, screen: 'profile' }
   )
+
+  useEffect(() => {
+    writeWritingCoachOpen(state.screen === 'writingCoach')
+  }, [state.screen])
 
   const setAgeGroup = useCallback((ageGroup) => {
     setState((s) => ({ ...s, ageGroup }))
