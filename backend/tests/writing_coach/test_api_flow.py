@@ -131,7 +131,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
     listing = (await client.get("/api/v1/wc/sessions", headers=h)).json()
     assert listing[0]["draft"]["level"] == "3-" and listing[0]["rewrite"]["percent"] == 72
     ov = (await client.get("/api/v1/wc/overview", headers=h)).json()
-    assert ov["session_count"] == 1 and ov["steps"][0]["step"] == "extend"
+    assert ov["session_count"] == 1 and ov["criteria"][0]["key"] == "evidence"
     assert ov["command_words_missed"] == [["explain", 1]]
 
     # next session's reminder carries his last goal
@@ -226,17 +226,12 @@ async def test_parent_settings_change_what_the_student_gets(client, llm, admin_t
     h, pid = await make_profile(client)
     admin = {"X-Admin-Token": ADMIN_TOKEN}
     r = await client.put(f"/api/v1/wc/parent/settings?profile_id={pid}", headers=admin,
-                         json={"history_strand": "B", "focus_week": 3, "rubric_override": "Use two quotes."})
-    assert r.json() == {"history_strand": "B", "rubric_override": "Use two quotes.", "focus_week": 3}
+                         json={"history_strand": "B", "focus_week": 3})
+    assert r.json() == {"history_strand": "B", "focus_week": 3}
     rem = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert rem["focus_week"] == 3 and rem["rubric_override"] == "Use two quotes."
+    assert rem["focus_week"] == 3
     s = await start_session(client, h)
     assert s["topic_id"].startswith("b-") and s["focus_week"] == 3
-    # the teacher's rubric reaches the Reviewer prompt
-    sub = (await client.post(f"/api/v1/wc/sessions/{s['id']}/read", headers=h, json={"kind": "draft", "images": [IMG]})).json()
-    await client.put(f"/api/v1/wc/submissions/{sub['submission_id']}/transcript", headers=h, json={"text": TRANSCRIPT})
-    await client.post(f"/api/v1/wc/submissions/{sub['submission_id']}/review", headers=h)
-    assert any("Use two quotes." in c["prompt"] for c in llm if "marking a written answer" in c["prompt"])
 
 
 async def test_topics_rotate_instead_of_repeating(client, llm):

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.integrations.langchainrouter import LLMServiceError, call_llm_with_usage
+from app.writing_coach.rubric import RUBRIC
 from app.writing_coach.schemas import (
     COMMAND_WORDS,
     GeneratedItem,
@@ -249,7 +250,6 @@ async def review_answer(
     kind: str,
     item: dict,
     focus: str,
-    rubric_override: str | None,
     transcript: str,
 ) -> tuple[Review, str]:
     """Grade the CONFIRMED transcript. Returns (review, model used)."""
@@ -264,14 +264,12 @@ async def review_answer(
             "parts": item["parts"],
             "key_terms": item["key_terms"],
             "focus": focus,
-            "rubric_override": (rubric_override or "").strip() or None,
+            "rubric": RUBRIC,
             "transcript": transcript,
         },
         Review,
         model=reviewer_model(),
         temperature=REVIEWER_TEMPERATURE,
     )
-    review.drop_unmatched_tags(transcript)
-    review.drop_unmatched_conventions(transcript)
-    review.apply_conventions()
+    review.check_against_transcript(transcript)
     return review, reviewer_model()

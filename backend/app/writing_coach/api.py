@@ -17,6 +17,7 @@ from app.api.deps import SessionDep, require_admin
 from app.integrations.langchainrouter import LLMServiceError
 from app.models.tables import Profile, WcReview, WcSession, WcSettings, WcSubmission
 from app.writing_coach import agents
+from app.writing_coach.rubric import CRITERIA_KEYS, sentence_stats
 from app.writing_coach.schemas import (
     CONVENTION_CATEGORIES,
     DecodeAnswer,
@@ -44,6 +45,7 @@ parent_router = APIRouter(
 RECENT_DAYS = 30
 MAX_UNFINISHED = 5  # how many unfinished practices the start page offers
 ERROR_WINDOW = 5  # the personal error tracker looks at his latest 5 reviewed practices
+TREND_WINDOW = 10  # the parent's criteria table shows his latest 10 drafts
 FOCUS_WEEKS = {
     1: ("Decode, Restate, Answer", "Circle the command word, count the parts, restate the question in your first sentence, and answer every part."),
     2: ("Cite and Explain", "Use two pieces of evidence, and after each one explain how it proves your point (two evidence-and-explain pairs)."),
@@ -208,10 +210,21 @@ def _summary_rows(sessions, subs_by_session, reviews) -> list[dict]:
     ]
 
 
-def _conventions_of(rev: WcReview) -> dict:
-    """The conventions block of a stored review ({} for older reviews that had a list)."""
+def _errors_of(rev: WcReview) -> list[dict]:
+    """Writing errors in a stored review, new format or old ({} for the oldest, which had a list)."""
+    criteria = rev.review.get("criteria")
+    if criteria:
+        return criteria["communication"].get("errors", [])
     block = rev.review.get("conventions")
-    return block if isinstance(block, dict) else {}
+    return block.get("errors", []) if isinstance(block, dict) else []
+
+
+def _marks_of(rev: WcReview) -> dict | None:
+    """Level and percent per criterion. None for reviews from before the teacher's rubric."""
+    criteria = rev.review.get("criteria")
+    if not criteria:
+        return None
+    return {k: {"level": criteria[k]["level"], "percent": criteria[k]["percent"]} for k in CRITERIA_KEYS}
 
 
 def _draft_reviews(sessions, subs_by_session, reviews) -> list[tuple[WcSession, WcReview]]:
@@ -229,7 +242,7 @@ def _error_counts(drafts: list[tuple[WcSession, WcReview]]) -> list[dict]:
     """Conventions errors across these draft reviews, grouped by category, most common first."""
     counts: dict[str, int] = {}
     for _, rev in drafts:
-        for err in _conventions_of(rev).get("errors", []):
+        for err in _errors_of(rev):
             cat = err.get("category", "other")
             counts[cat] = counts.get(cat, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: -kv[1])
@@ -243,7 +256,7 @@ def _fixed_summary(draft_rev: WcReview | None, rewrite_sub: WcSubmission | None)
     if draft_rev is None or rewrite_sub is None:
         return None
     text = rewrite_sub.transcript_confirmed or rewrite_sub.transcript_original
-    return check_fixed_errors(_conventions_of(draft_rev).get("errors", []), text)
+    return check_fixed_errors(_errors_of(draft_rev), text)
 
 
 def _stage(subs: dict[str, WcSubmission], reviews: dict[uuid.UUID, WcReview]) -> str:
@@ -294,7 +307,6 @@ async def reminder(profile: ProfileDep, session: SessionDep):
         "focus_title": title,
         "focus_text": text,
         "last_next_time": last.next_time if last else None,
-        "rubric_override": settings.rubric_override,
         "suggested_subject": subject,
         "is_rest_day": rest,
         "history_strand": settings.history_strand,
@@ -445,21 +457,19 @@ async def review_submission(submission_id: uuid.UUID, profile: ProfileDep, sessi
         return review_out(existing)
     if sub.transcript_confirmed is None:
         raise HTTPException(status_code=409, detail="Confirm the text first.")
-    settings = await get_settings_row(session, profile.id)
     try:
         review, model = await agents.review_answer(
             subject=row.subject,
             kind=sub.kind,
             item=row.item,
             focus=FOCUS_WEEKS[row.focus_week][0],
-            rubric_override=settings.rubric_override,
             transcript=sub.transcript_confirmed,
         )
     except LLMServiceError as exc:
         raise _llm_call_failed(exc) from exc
     rev = WcReview(
-        submission_id=sub.id, review=review.model_dump(), level=review.level,
-        percent=review.percent, model=model,
+        submission_id=sub.id, review=review.model_dump(), level=review.overall.level,
+        percent=review.overall.percent, model=model,
     )
     session.add(rev)
     row.status = "draft_reviewed" if sub.kind == "draft" else "rewrite_reviewed"
@@ -515,9 +525,6 @@ async def session_report(session_id: uuid.UUID, profile: ProfileDep, session: Se
     }
 
 
-STEPS = ["restate", "answer", "cite", "explain", "extend"]
-
-
 @router.get("/overview")
 async def overview(profile: ProfileDep, session: SessionDep):
     """Where he is lagging, worked out from stored reviews (no AI calls)."""
@@ -530,15 +537,14 @@ async def overview(profile: ProfileDep, session: SessionDep):
             reviewed.append((s, rev, subs[s.id].get("rewrite")))
     recent = reviewed[:5]
 
-    step_avg = []
-    for step in STEPS:
-        scores = [r.review["scores"][step]["score"] for _, r, _ in recent]
-        step_avg.append({
-            "step": step,
-            "average": round(sum(scores) / len(scores), 2) if scores else None,
-            "missing_count": sum(1 for sc in scores if sc == 0),
-        })
-    step_avg.sort(key=lambda x: (x["average"] is None, x["average"] if x["average"] is not None else 0))
+    marks = [m for m in (_marks_of(r) for _, r, _ in recent) if m]
+    criteria = sorted(
+        (
+            {"key": key, "average": round(sum(m[key]["percent"] for m in marks) / len(marks))}
+            for key in CRITERIA_KEYS
+        ) if marks else [],
+        key=lambda c: c["average"],
+    )
 
     missed_parts_sessions = sum(1 for _, r, _ in recent if r.review.get("missedParts"))
     wrong_words: dict[str, int] = {}
@@ -553,19 +559,18 @@ async def overview(profile: ProfileDep, session: SessionDep):
             "date": _iso(s.created_at), "subject": s.subject,
             "draft_percent": r.percent, "rewrite_percent": rw.percent if rw else None,
         })
-    words = [word_count(subs[s.id]["draft"].transcript_confirmed or "") for s, _, _ in recent]
+    sentences = [
+        sentence_stats(subs[s.id]["draft"].transcript_confirmed or "")["sentenceCount"] for s, _, _ in recent
+    ]
     drafts = _draft_reviews(sessions, subs, revs)[:ERROR_WINDOW]
-    conv_scores = [_conventions_of(r).get("score") for _, r in drafts]
-    conv_scores = [c for c in conv_scores if c is not None]
     return {
         "top_errors": _error_counts(drafts)[:5],
-        "conventions_average": round(sum(conv_scores) / len(conv_scores), 2) if conv_scores else None,
         "session_count": len(reviewed),
         "recent_count": len(recent),
-        "steps": step_avg,
+        "criteria": criteria,
         "sessions_with_missed_parts": missed_parts_sessions,
         "command_words_missed": sorted(wrong_words.items(), key=lambda kv: -kv[1]),
-        "average_word_count": round(sum(words) / len(words)) if words else None,
+        "average_sentence_count": round(sum(sentences) / len(sentences)) if sentences else None,
         "timeline": timeline,
     }
 
@@ -595,32 +600,41 @@ async def parent_sessions(session: SessionDep, profile_id: Annotated[uuid.UUID, 
     return rows
 
 
-@parent_router.get("/conventions")
-async def parent_conventions(session: SessionDep, profile_id: Annotated[uuid.UUID, Query()]):
-    """Conventions score trend and the most common error types."""
+@parent_router.get("/progress")
+async def parent_progress(session: SessionDep, profile_id: Annotated[uuid.UUID, Query()]):
+    """Draft marks per criterion over time, which criterion is lowest, and common errors."""
     await _profile_or_404(session, profile_id)
     sessions, subs, revs = await _list_rows(session, profile_id)
     drafts = _draft_reviews(sessions, subs, revs)
+    rows = [(s, r) for s, r in drafts if _marks_of(r)][:TREND_WINDOW]
     trend = []
-    for s, draft_rev in reversed(drafts):  # oldest first
+    for s, draft_rev in reversed(rows):  # oldest first
         rewrite_sub = subs[s.id].get("rewrite")
         rewrite_rev = revs.get(rewrite_sub.id) if rewrite_sub else None
         fixed = _fixed_summary(draft_rev, rewrite_sub) if rewrite_rev else None
         trend.append({
             "date": _iso(s.created_at),
             "subject": s.subject,
-            "draft_score": _conventions_of(draft_rev).get("score"),
-            "rewrite_score": _conventions_of(rewrite_rev).get("score") if rewrite_rev else None,
+            **_marks_of(draft_rev),
+            "overall": {"level": draft_rev.level, "percent": draft_rev.percent},
+            "cap_applied": draft_rev.review["overall"]["capApplied"],
             "errors_flagged": len(fixed) if fixed is not None else None,
             "errors_fixed": sum(1 for f in fixed if f["status"] == "fixed") if fixed is not None else None,
         })
-    return {"trend": trend, "top_errors": _error_counts(drafts[:10])[:6]}
+    averages = {
+        key: round(sum(t[key]["percent"] for t in trend) / len(trend)) for key in (*CRITERIA_KEYS, "overall")
+    } if trend else {}
+    return {
+        "trend": trend,
+        "averages": averages,
+        "lowest": min(CRITERIA_KEYS, key=lambda k: averages[k]) if trend else None,
+        "top_errors": _error_counts(drafts[:10])[:6],
+    }
 
 
 def _settings_out(row: WcSettings) -> dict:
     return {
         "history_strand": row.history_strand,
-        "rubric_override": row.rubric_override,
         "focus_week": row.focus_week,
     }
 
@@ -641,8 +655,6 @@ async def parent_put_settings(
         row.history_strand = data.history_strand
     if data.focus_week is not None:
         row.focus_week = data.focus_week
-    if "rubric_override" in data.model_fields_set:
-        row.rubric_override = (data.rubric_override or "").strip() or None
     await session.commit()
     return _settings_out(row)
 

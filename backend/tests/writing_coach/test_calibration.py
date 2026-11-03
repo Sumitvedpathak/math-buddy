@@ -59,9 +59,9 @@ async def test_reviewer_ranks_level_2_3_4_in_order():
     for text in (LEVEL_2, LEVEL_3, LEVEL_4):
         review, _ = await review_answer(
             subject="history", kind="draft", item=ITEM, focus="Cite and Explain",
-            rubric_override=None, transcript=text,
+            transcript=text,
         )
-        percents.append(review.percent)
+        percents.append(review.overall.percent)
     print("Level 2 / 3 / 4 sample percents:", percents)
     # Order and spread matter; exact scores vary by model. Observed 2026-11-02:
     #   Haiku-class Reviewer 50 / 68 / 75, Sonnet-class Reviewer 54 / 74 / 88.

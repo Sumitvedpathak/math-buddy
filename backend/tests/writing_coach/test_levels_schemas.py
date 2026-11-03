@@ -46,20 +46,7 @@ def test_clamp_percent_to_level():
 
 def test_review_accepts_valid_json():
     r = Review.model_validate(GOOD_REVIEW)
-    assert r.level == "3-" and r.percent == 72 and r.allPartsAnswered
-
-
-def test_review_pulls_mismatched_percent_into_the_level_band():
-    r = Review.model_validate({**GOOD_REVIEW, "level": "2", "percent": 78})
-    assert r.level == "2" and r.percent == 66
-
-
-def test_review_rejects_unknown_level_and_bad_score():
-    with pytest.raises(ValidationError):
-        Review.model_validate({**GOOD_REVIEW, "level": "5"})
-    bad = {**GOOD_REVIEW, "scores": {**GOOD_REVIEW["scores"], "cite": {"score": 3, "note": ""}}}
-    with pytest.raises(ValidationError):
-        Review.model_validate(bad)
+    assert r.overall.level == "3-" and r.overall.percent == 72 and r.allPartsAnswered
 
 
 def test_review_missed_parts_force_all_parts_false():
@@ -81,7 +68,7 @@ def test_review_drops_tags_not_found_in_transcript():
 def test_generated_item_validates_lengths():
     GeneratedItem.model_validate(GOOD_ITEM)
     with pytest.raises(ValidationError):
-        GeneratedItem.model_validate({**GOOD_ITEM, "model_answer": "too short"})
+        GeneratedItem.model_validate({**GOOD_ITEM, "model_answer": "Too short."})
     with pytest.raises(ValidationError):
         GeneratedItem.model_validate({**GOOD_ITEM, "key_terms": ["a", "b"]})
 

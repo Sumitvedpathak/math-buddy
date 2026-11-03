@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { wc } from './wcApi'
 import Report from './Report'
-import { STEP_BY_KEY, SUBJECT_LABEL } from './colours'
+import { CRITERIA_LABELS, SUBJECT_LABEL } from './colours'
 import { btn, btnGhost } from './Start'
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -12,39 +12,36 @@ function Overview({ overview }) {
   if (!overview || overview.session_count === 0) {
     return <p className="text-ink-soft">Finish your first practice and your progress will show up here.</p>
   }
-  const { steps, recent_count: recent } = overview
+  const { criteria, recent_count: recent } = overview
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="font-semibold text-ink">Where you are lagging (your last {recent} {recent === 1 ? 'session' : 'sessions'})</h3>
-        <ul className="mt-3 space-y-2 list-none p-0">
-          {steps.map((s) => (
-            <li key={s.step}>
-              <div className="flex justify-between text-sm">
-                <span className="text-ink">{STEP_BY_KEY[s.step].label}</span>
-                <span className="font-mono text-ink-soft">
-                  {s.average} / 2{s.missing_count > 0 && ` · missing in ${s.missing_count}`}
-                </span>
-              </div>
-              <div className="mt-1 h-2 rounded-full bg-muted">
-                <div className="h-2 rounded-full" style={{ width: `${(s.average / 2) * 100}%`, background: STEP_BY_KEY[s.step].border }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-sm text-ink-soft">
-          Weakest first. <strong className="text-ink">{STEP_BY_KEY[steps[0].step].label}</strong> needs the most work.
-        </p>
-      </div>
+      {criteria.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-ink">Where you are lagging (your last {recent} {recent === 1 ? 'session' : 'sessions'})</h3>
+          <ul className="mt-3 space-y-2 list-none p-0">
+            {criteria.map((c) => (
+              <li key={c.key}>
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink">{CRITERIA_LABELS[c.key]}</span>
+                  <span className="font-mono text-ink-soft">{c.average}%</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${c.average}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-ink-soft">
+            Weakest first. <strong className="text-ink">{CRITERIA_LABELS[criteria[0].key]}</strong> needs the most work.
+          </p>
+        </div>
+      )}
       {overview.top_errors?.length > 0 && (
         <div>
           <h3 className="font-semibold text-ink">Your most common writing mistakes</h3>
           <ul className="mt-2 list-disc pl-5 text-ink-soft">
             {overview.top_errors.map((e) => <li key={e.category}>{e.label}: {e.count} {e.count === 1 ? 'time' : 'times'}</li>)}
           </ul>
-          {overview.conventions_average != null && (
-            <p className="mt-2 text-sm text-ink-soft">Your average conventions score is {overview.conventions_average} out of 2.</p>
-          )}
         </div>
       )}
       <ul className="list-disc pl-5 text-ink-soft space-y-1">
@@ -54,8 +51,8 @@ function Overview({ overview }) {
         {overview.command_words_missed.length > 0 && (
           <li>Command words you decoded wrongly: {overview.command_words_missed.map(([w, n]) => `${w} (${n})`).join(', ')}.</li>
         )}
-        {overview.average_word_count != null && (
-          <li>Your drafts average {overview.average_word_count} words. The target is 150 to 250.</li>
+        {overview.average_sentence_count != null && (
+          <li>Your drafts average {overview.average_sentence_count} sentences. The target is 5 to 7.</li>
         )}
       </ul>
       <div>

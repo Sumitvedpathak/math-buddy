@@ -9,8 +9,15 @@ export const CRITERIA = [
   'Explain: after each piece of evidence, I will explain how it proves my point ("This shows that…").',
   'Extend (Level 4): I will add one deeper idea: another group\'s perspective, a link to today, short- versus long-term effects, or the author\'s choice and why.',
   'I will use at least 2 subject words (for example Loyalist, seigneury, treaty, theme, symbol).',
-  'I will aim for 150 to 250 words and check my work against this list before I submit.',
+  'I will write 5 to 7 complete sentences with different openings, and check my work against this list before I submit.',
   'Before I take my photo I will reread my paper once for COPS (Capitals, Overall, Punctuation, Spelling) and fix mistakes in pen.',
+]
+
+/** The teacher's Level 4 column, in words a student can use while writing. */
+const LEVEL_4 = [
+  ['Understand:', 'answer the whole question + one insight'],
+  ['Evidence:', 'specific proof + explain how it supports you'],
+  ['Communicate:', '5–7 complete sentences, varied openings, check capitals/spelling/punctuation'],
 ]
 
 export const btn =
@@ -97,12 +104,14 @@ export default function Start({ reminder, onBegin, onHistory, onContinue, busy }
         </section>
       )}
 
-      {reminder.rubric_override && (
-        <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Teacher success criteria">
-          <h2 className="font-display text-xl font-semibold text-ink">Your teacher&apos;s success criteria</h2>
-          <p className="mt-3 whitespace-pre-wrap text-ink-soft">{reminder.rubric_override}</p>
-        </section>
-      )}
+      <section className="rounded-2xl bg-card ring-soft p-6" aria-label="What Level 4 looks like">
+        <h2 className="font-display text-xl font-semibold text-ink">What Level 4 looks like</h2>
+        <ul className="mt-3 space-y-2 list-none p-0 text-ink-soft">
+          {LEVEL_4.map(([name, text]) => (
+            <li key={name}><strong className="text-ink">{name}</strong> {text}</li>
+          ))}
+        </ul>
+      </section>
 
       <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Success criteria">
         <h2 className="font-display text-xl font-semibold text-ink">My success criteria</h2>
