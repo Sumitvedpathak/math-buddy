@@ -39,7 +39,7 @@ export default function EditPass({ topErrors, onDone }) {
               <label className="flex gap-3 cursor-pointer items-start">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 accent-[var(--primary)]"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--primary)]"
                   checked={ticked[i]}
                   onChange={(e) => setTicked((t) => t.map((v, j) => (j === i ? e.target.checked : v)))}
                 />

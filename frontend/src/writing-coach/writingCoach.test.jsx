@@ -194,8 +194,14 @@ describe('WritingCoach', () => {
     })
     await screen.findByText(/Thinking focus: not quite. It was Cause and Consequence/)
     await user.click(screen.getByRole('button', { name: 'Start writing' }))
-    expect(await screen.findByRole('timer')).toHaveTextContent('15:00')
+    expect(await screen.findByRole('heading', { name: 'Write your answer' })).toBeInTheDocument()
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument()
     expect(screen.getByText(/at the top of your page/)).toBeInTheDocument()
+    // the success criteria stay on screen while he writes, in an expandable section
+    const criteria = screen.getByText('My success criteria').closest('details')
+    expect(criteria).toHaveAttribute('open')
+    expect(within(criteria).getAllByRole('checkbox')).toHaveLength(CRITERIA.length)
+    expect(screen.getByText(/Restate: I will turn the question into my first sentence/)).toBeInTheDocument()
   })
 
   it('has a Back button on each step to return to the previous one', async () => {
@@ -225,7 +231,7 @@ describe('WritingCoach', () => {
     await user.selectOptions(screen.getByLabelText(/thinking focus/i), 'Cause and Consequence')
     await user.click(screen.getByRole('button', { name: 'Check my decoding' }))
     await user.click(await screen.findByRole('button', { name: 'Start writing' }))
-    await screen.findByRole('timer')
+    await screen.findByRole('heading', { name: 'Write your answer' })
     await user.click(screen.getByRole('button', { name: /take a photo/i }))
     await screen.findByText(/Check your paper with COPS/)
     for (const box of screen.getAllByRole('checkbox')) await user.click(box)
@@ -234,7 +240,7 @@ describe('WritingCoach', () => {
     await user.click(screen.getByRole('button', { name: /Back/ }))
     await screen.findByText(/Check your paper with COPS/)
     await user.click(screen.getByRole('button', { name: /Back/ }))
-    await screen.findByRole('timer')
+    await screen.findByRole('heading', { name: 'Write your answer' })
     await user.click(screen.getByRole('button', { name: /Back/ }))
     await screen.findByText(ITEM.question)
   })

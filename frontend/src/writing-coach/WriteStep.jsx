@@ -1,24 +1,13 @@
-import { useEffect, useState } from 'react'
-import { btn, btnGhost } from './Start'
+import { useState } from 'react'
+import { btn, CRITERIA } from './Start'
 import { QuestionCard } from './QuestionDecode'
 
-export function formatClock(totalSeconds) {
-  const s = Math.max(0, totalSeconds)
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-}
-
-/** Step 4 (and the rewrite): big timer, question on screen, write on paper. */
-export default function WriteStep({ session, kind, minutes, feedback, onDone }) {
-  const [remaining, setRemaining] = useState(minutes * 60)
-  const [running, setRunning] = useState(false)
-
-  useEffect(() => {
-    if (!running) return undefined
-    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000)
-    return () => clearInterval(id)
-  }, [running])
-
+/** Step 4 (and the rewrite): the question and his success criteria on screen while he writes on paper. */
+export default function WriteStep({ session, kind, feedback, onDone }) {
+  // Self-check ticks only; nothing here is required to continue.
+  const [ticked, setTicked] = useState(() => CRITERIA.map(() => false))
   const isRewrite = kind === 'rewrite'
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12 space-y-8">
       <header>
@@ -34,24 +23,30 @@ export default function WriteStep({ session, kind, minutes, feedback, onDone }) 
         </p>
       </header>
 
-      <section className="rounded-2xl bg-card ring-soft p-8 text-center" aria-label="Timer">
-        <p
-          className={`font-mono text-7xl font-semibold ${remaining === 0 ? 'text-destructive' : 'text-ink'}`}
-          role="timer"
-          aria-live="off"
-        >
-          {formatClock(remaining)}
-        </p>
-        <div className="mt-5 flex justify-center gap-3">
-          <button type="button" className={btn} onClick={() => setRunning((r) => !r)}>
-            {running ? 'Pause' : remaining === minutes * 60 ? 'Start timer' : 'Resume'}
-          </button>
-          <button type="button" className={btnGhost} onClick={() => { setRunning(false); setRemaining(minutes * 60) }}>
-            Reset
-          </button>
-        </div>
-        <p className="mt-3 text-sm text-muted-foreground">{minutes} minutes. Stopping early is fine.</p>
-      </section>
+      <QuestionCard item={session.item} />
+
+      <details open className="rounded-2xl bg-card ring-soft p-6 group" aria-label="My success criteria">
+        <summary className="cursor-pointer list-none font-display text-xl font-semibold text-ink flex items-center justify-between">
+          My success criteria
+          <span className="text-sm font-normal text-muted-foreground group-open:hidden">Tap to open</span>
+          <span className="text-sm font-normal text-muted-foreground hidden group-open:inline">Tap to close</span>
+        </summary>
+        <ul className="mt-4 space-y-3 list-none p-0">
+          {CRITERIA.map((text, i) => (
+            <li key={text}>
+              <label className="flex gap-3 cursor-pointer items-start text-ink-soft">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--primary)]"
+                  checked={ticked[i]}
+                  onChange={(e) => setTicked((t) => t.map((v, j) => (j === i ? e.target.checked : v)))}
+                />
+                <span>{text}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </details>
 
       {isRewrite && feedback && (
         <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Your feedback">
@@ -62,8 +57,6 @@ export default function WriteStep({ session, kind, minutes, feedback, onDone }) 
           {feedback.pushQuestion && <p className="mt-3 text-ink"><strong>Push yourself:</strong> {feedback.pushQuestion}</p>}
         </section>
       )}
-
-      <QuestionCard item={session.item} />
 
       <button type="button" className={btn} onClick={onDone}>I have finished writing. Take a photo</button>
     </div>

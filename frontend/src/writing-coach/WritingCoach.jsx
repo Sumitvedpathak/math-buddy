@@ -12,8 +12,6 @@ import WrapUp from './WrapUp'
 import History from './History'
 
 const ACTIVE_KEY = 'mathBuddy.wc.activeSession'
-const DRAFT_MINUTES = 15
-const REWRITE_MINUTES = 8
 
 function rememberActive(id) {
   try {
@@ -269,7 +267,6 @@ export default function WritingCoach() {
             key={kind}
             session={session}
             kind={kind}
-            minutes={kind === 'rewrite' ? REWRITE_MINUTES : DRAFT_MINUTES}
             feedback={kind === 'rewrite' ? feedback : null}
             onDone={() => setStep('edit')}
           />
