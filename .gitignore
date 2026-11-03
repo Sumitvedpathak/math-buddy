@@ -47,3 +47,6 @@ darktheme/
 # Textbook pages rendered from resources/*.pdf by backend/scripts/build_lesson_theory.py
 # (copyrighted source material - regenerate locally, do not commit)
 frontend/public/lessons/
+
+# Local SQLite databases (dev/test); never commit
+*.db

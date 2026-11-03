@@ -21,6 +21,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Writing Coach (temporary; grade 7 son only)
+
+Written-answer practice for Language and History, marked against the Ontario achievement chart. **Photos are never stored**: the browser compresses/strips EXIF, the Reader agent reads them in memory, only the verbatim transcript (original + confirmed + word diff) and the review are saved.
+- **Backend**: `backend/app/writing_coach/` (self-contained). Three agents in `agents.py` (Generator, Reader, Reviewer): Jinja2 prompts in `writing_coach/prompts/`, pydantic schemas, one retry with a repair note. Per-agent models via env `WC_GENERATOR_MODEL`, `WC_READER_MODEL` (must accept images), `WC_REVIEWER_MODEL` (fall back to `MATH_BUDDY_OPENROUTER_MODEL`). Reader temp 0, Reviewer 0.1. `call_llm_with_usage` in `langchainrouter.py` adds per-call model/temperature + token counts (token counts are logged, never content).
+- **Facts**: History questions are written ONLY from `writing_coach/data/history_strand_{a,b}.json` (**drafts, need parent review**). Language types in `language_types.json`.
+- **API**: all under `/api/v1/wc/`. Student routes need header `X-Profile-Id` (a grade 7 profile). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, and settings: strand, teacher rubric, focus week).
+- **Tables** (`wc_settings`, `wc_sessions`, `wc_submissions`, `wc_reviews`, migration `0002`). Levels: `levels.py` (1- to 4+, percent bands; the Reviewer's level wins, percent is clamped into its band). A correction may fix misread words but not add content (`transcript.py`).
+- **Conventions** (marked in EVERY review, any subject): the Reviewer scores them 0-2 and lists up to 10 errors (original, correction, type, category, rule). `level`/`percent` from the model are CONTENT only; `Review.apply_conventions()` steps the level down 0/1/2 (never below 1-) and keeps `contentLevel`. Errors not found verbatim in the transcript, or on a word the Reader marked `[?]` (ambiguous capital), are dropped. The Reader copies spelling/capitals exactly; at the confirm step he may fix only misread words: capital-only changes are refused (422) and one-word spelling-like fixes are flagged `suspect` in the stored diff (shown to the parent). A COPS edit pass (`EditPass.jsx`) comes before the photo. Personal error tracker: errors grouped by `category` over his latest 5 reviewed drafts, top recurring 3 on the reminder; the rewrite report checks each draft error (`check_fixed_errors`: fixed / still_there / rewritten). Parent panel: conventions trend, common errors, corrections list (`GET /wc/parent/conventions`).
+- **Frontend**: `frontend/src/writing-coach/`, screen `writingCoach`, opened from a small link on the grade 7 setup screen (`PracticePage`). An unfinished session resumes via localStorage `mathBuddy.wc.activeSession`.
+- **Remove later**: delete `app/writing_coach`, `src/writing-coach`, `tests/writing_coach`; `alembic downgrade 0001`; remove the 4 table classes in `models/tables.py`, the router include in `api/v1/__init__.py`, the `writingCoach` case in `App.jsx`/typedef, the link in `PracticePage`, and the panel in `AdminApp`.
+- **Calibration** (real model, costs cents): `WC_CALIBRATE=1 pytest tests/writing_coach/test_calibration.py -s`. 2026-11-02: Haiku-class Reviewer scored sample L2/L3/L4 answers 50/68/75, Sonnet-class 54/74/88, so use a Sonnet-class Reviewer.
+
+---
+
 ## Quick Commands
 
 ### Backend (Python/FastAPI)

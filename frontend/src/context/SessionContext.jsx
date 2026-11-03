@@ -19,7 +19,7 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  */
 
 /**
- * @typedef {"profile"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"} AppScreen
+ * @typedef {"profile"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"|"writingCoach"} AppScreen
  */
 
 /**

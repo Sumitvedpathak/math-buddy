@@ -140,4 +140,14 @@ describe('setup stage — lesson picker', () => {
     expect(screen.queryByRole('region', { name: /unit 2 lessons/i })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: /unit 10 lessons/i })).toBeInTheDocument()
   })
+  it('offers a Writing Coach link to grade 7 profiles only', async () => {
+    const { ctx, user } = renderSetup({}, { navigateTo: vi.fn() })
+    await user.click(screen.getByRole('button', { name: 'Open Writing Coach' }))
+    expect(ctx.navigateTo).toHaveBeenCalledWith('writingCoach')
+  })
+
+  it('hides the Writing Coach link for grade 6', () => {
+    renderSetup({ profile: GRADE6, curriculum: [] }, { navigateTo: vi.fn() })
+    expect(screen.queryByRole('button', { name: 'Open Writing Coach' })).not.toBeInTheDocument()
+  })
 })

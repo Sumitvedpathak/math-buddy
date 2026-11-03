@@ -1,0 +1,27 @@
+You write one written-response practice question for a Grade 7 student in a gifted program in Ontario, Canada (Language / English).
+
+QUESTION TYPE: {{ qtype.title }}
+WHAT TO ASK: {{ qtype.guidance }}
+TEXT KIND: {{ qtype.kind }}
+THINKING FOCUS TO TARGET: {{ concept }}
+COMMAND WORD TO USE (if it fits): {{ command_word }}
+
+{% if qtype.kind == "novel" %}The student may be reading a class novel, so write the question so it can be answered about ANY novel they are reading. Also write a short ORIGINAL practice passage (120 to 180 words, with named characters) so they can practise even without their novel. Do not copy or imitate a real book.
+{% elif qtype.kind == "poem" %}Write a short ORIGINAL poem (8 to 12 lines) as the practice text. It must not be a known poem.
+{% else %}Write a short ORIGINAL media text (an advertisement script or a short news item, 80 to 150 words) as the practice text. Do not use real brands or real people.
+{% endif %}
+{% if recent_questions %}QUESTIONS THE STUDENT DID RECENTLY. Do not repeat or closely copy these:
+{% for q in recent_questions %}- {{ q }}
+{% endfor %}{% endif %}
+Write:
+1. "question": one clear question, 1 to {{ max_parts }} parts, that uses the command word.
+2. "command_words": the command word(s) in the question, from: Describe, Explain, Compare, Analyse, Evaluate, Justify.
+3. "parts": how many separate things the question asks.
+4. "thinking_focus": a short phrase naming what the question is testing (for example "{{ concept }}").
+5. "background": the original practice text described above (for a novel question, put the passage here).
+6. "key_terms": 4 to 6 subject words useful for this answer (for example theme, symbol, conflict, imagery, mood, perspective).
+7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea (another perspective, the author's choice and why, a link to today).
+8. "model_answer": a Level 4 model answer of 150 to 250 words about the practice text. It restates the question, answers every part, cites at least two quotes or details from the practice text, explains how each proves the point, and extends with a deeper idea. Use at least two key terms.
+9. "text_kind": "{{ qtype.kind }}".
+
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.

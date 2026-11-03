@@ -16,7 +16,7 @@ export default function PracticePage() {
   const {
     state,
     setAgeGroup, toggleTopic, setQuestionCount, startSession, openLesson,
-    setAnswer, submitAnswers,
+    setAnswer, submitAnswers, navigateTo,
   } = useSession()
   const {
     questions, answers, error, ageGroup, selectedTopics, questionCount,
@@ -61,6 +61,7 @@ export default function PracticePage() {
       curriculum={curriculum ?? []}
       lessonStatus={lessonStatus ?? {}}
       onPracticeLesson={openLesson}
+      onOpenWritingCoach={() => navigateTo('writingCoach')}
     />
   }
 
@@ -163,7 +164,7 @@ export default function PracticePage() {
 /* ── Setup Stage ── */
 function SetupStage({
   ageGroup, setAgeGroup, selectedTopics, toggleTopic, questionCount, setQuestionCount, onStart,
-  profile, curriculum, lessonStatus, onPracticeLesson,
+  profile, curriculum, lessonStatus, onPracticeLesson, onOpenWritingCoach,
 }) {
   const canStart = selectedTopics.length > 0
   // A loaded profile already encodes the age group (grade 6 → 9-10, grade 7 → 11-12).
@@ -196,6 +197,18 @@ function SetupStage({
             <span className="text-xs text-muted-foreground">Pick a unit, then a lesson.</span>
           </div>
           <CurriculumPicker units={curriculum} lessonStatus={lessonStatus} onPractice={onPracticeLesson} />
+          {profile?.grade === '7' && (
+            <p className="mt-5 text-sm text-ink-soft">
+              Want to practise writing answers?{' '}
+              <button
+                type="button"
+                onClick={onOpenWritingCoach}
+                className="font-medium text-primary underline underline-offset-4 hover:opacity-80"
+              >
+                Open Writing Coach
+              </button>
+            </p>
+          )}
         </section>
       )}
 

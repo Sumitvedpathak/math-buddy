@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { adminGet } from '../../lib/api'
 import { theme, setTheme } from '../../themes/dandysWorld'
+import WritingCoachPanel from '../../writing-coach/WritingCoachPanel'
 
 const WEEKS_SHOWN = 12
 
@@ -117,6 +118,7 @@ function ProfileDetail({ token, profile }) {
       <Panel title="Attempt history" state={attempts}>
         {(rows) => <AttemptTable attempts={rows} />}
       </Panel>
+      {profile.grade === '7' && <WritingCoachPanel token={token} profileId={profile.id} />}
     </div>
   )
 }
