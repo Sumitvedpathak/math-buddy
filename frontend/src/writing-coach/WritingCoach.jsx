@@ -35,19 +35,19 @@ export function stepFromReport(report) {
   const { session, submissions } = report
   const { draft, rewrite } = submissions
   if (session.status === 'done') return null
+  // An unmarked answer goes back to the check step: marking costs money and can fail,
+  // so it only ever runs when he presses the button.
   if (rewrite) {
-    if (rewrite.review) return { step: 'report', kind: 'rewrite' }
-    return rewrite.confirmed
-      ? { step: 'review', kind: 'rewrite', submission: rewrite }
+    return rewrite.review
+      ? { step: 'report', kind: 'rewrite' }
       : { step: 'confirm', kind: 'rewrite', submission: rewrite }
   }
   if (draft) {
-    if (draft.review) return { step: 'report', kind: 'draft' }
-    return draft.confirmed
-      ? { step: 'review', kind: 'draft', submission: draft }
+    return draft.review
+      ? { step: 'report', kind: 'draft' }
       : { step: 'confirm', kind: 'draft', submission: draft }
   }
-  return { step: 'question', kind: 'draft' }
+  return { step: session.decode ? 'write' : 'question', kind: 'draft' }
 }
 
 function BackBar({ onBack, label = 'Back' }) {
@@ -113,6 +113,36 @@ export default function WritingCoach() {
     [profileId, refreshReport]
   )
 
+  /** Reopen a saved practice at the right step. Returns false if it is already finished. */
+  const openSession = useCallback(
+    async (sessionId) => {
+      const r = await wc.report(profileId, sessionId)
+      const resume = stepFromReport(r)
+      if (!resume) return false
+      setReport(r)
+      setSession(r.session)
+      setKind(resume.kind)
+      setImages(null)
+      setModel(null)
+      setSubmission(
+        resume.submission
+          ? { id: resume.submission.id, transcript: resume.submission.confirmed || resume.submission.original }
+          : null
+      )
+      rememberActive(sessionId)
+      setStep(resume.step)
+      return true
+    },
+    [profileId]
+  )
+
+  /** Back to the start page, with a fresh list of unfinished practice and his latest goal. */
+  const goToStart = useCallback(() => {
+    setError(null)
+    setStep('start')
+    wc.reminder(profileId).then(setReminder).catch(() => {})
+  }, [profileId])
+
   // Load the reminder, and resume an unfinished session after a refresh.
   useEffect(() => {
     if (!profileId || profile.grade !== '7') return
@@ -125,26 +155,13 @@ export default function WritingCoach() {
         const activeId = recallActive()
         if (activeId) {
           try {
-            const r = await wc.report(profileId, activeId)
-            const resume = stepFromReport(r)
-            if (cancelled) return
-            if (resume) {
-              setReport(r)
-              setSession(r.session)
-              setKind(resume.kind)
-              if (resume.submission) setSubmission({ id: resume.submission.id, transcript: resume.submission.confirmed || resume.submission.original })
-              if (resume.step === 'review') {
-                setStep('reviewing')
-                await reviewSubmission(resume.submission.id, activeId, resume.kind)
-              } else {
-                setStep(resume.step)
-              }
-              return
-            }
-          } catch {
-            // the saved session is gone or not ours: start fresh
+            if (await openSession(activeId)) return
+            rememberActive(null) // already finished
+          } catch (err) {
+            // Only forget it if the server says it is gone. A temporary failure keeps his place.
+            if (err.status === 404) rememberActive(null)
+            else if (!cancelled) setError('Could not reopen your practice. Please try Continue below.')
           }
-          rememberActive(null)
         }
         if (!cancelled) setStep('start')
       } catch (err) {
@@ -155,7 +172,7 @@ export default function WritingCoach() {
       }
     })()
     return () => { cancelled = true }
-  }, [profileId, profile?.grade, reviewSubmission])
+  }, [profileId, profile?.grade, openSession])
 
   if (!profile || profile.grade !== '7') {
     return (
@@ -229,18 +246,24 @@ export default function WritingCoach() {
           <BackBar label="Back to Math Buddy" onBack={() => navigateTo('practice')} />
           {errorBanner}
           {reminder && (
-            <Start reminder={reminder} busy={busy} onBegin={begin} onHistory={() => setStep('history')} />
+            <Start
+              reminder={reminder}
+              busy={busy}
+              onBegin={begin}
+              onHistory={() => setStep('history')}
+              onContinue={(id) => run(() => openSession(id))}
+            />
           )}
         </>
       )
     case 'history':
       return (
-        <History profileId={profileId} onBack={() => setStep('start')} onNew={() => setStep('start')} />
+        <History profileId={profileId} onBack={goToStart} onNew={goToStart} />
       )
     case 'question':
       return (
         <>
-          <BackBar onBack={() => { setError(null); setStep('start') }} />
+          <BackBar onBack={() => { rememberActive(null); goToStart() }} />
           {errorBanner}
           <QuestionDecode
             session={session}
@@ -362,7 +385,7 @@ export default function WritingCoach() {
           )}
           <div className="flex justify-center gap-3">
             <button type="button" className={btn} onClick={() => setStep('history')}>See my results</button>
-            <button type="button" className={btnGhost} onClick={() => { setStep('start') }}>Done</button>
+            <button type="button" className={btnGhost} onClick={goToStart}>Done</button>
           </div>
         </div>
       )

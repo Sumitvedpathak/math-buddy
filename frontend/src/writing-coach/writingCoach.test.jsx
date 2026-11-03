@@ -157,7 +157,8 @@ describe('stepFromReport', () => {
     const base = { session: { status: 'started' } }
     expect(stepFromReport({ ...base, submissions: {} }).step).toBe('question')
     expect(stepFromReport({ ...base, submissions: { draft: sub() } }).step).toBe('confirm')
-    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c' }) } }).step).toBe('review')
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c' }) } }).step).toBe('confirm')
+    expect(stepFromReport({ session: { status: 'started', decode: { parts_correct: true } }, submissions: {} }).step).toBe('write')
     expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c', review: {} }) } })).toEqual({ step: 'report', kind: 'draft' })
     expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }), rewrite: sub() } }).kind).toBe('rewrite')
     expect(stepFromReport({ session: { status: 'done' }, submissions: {} })).toBeNull()
@@ -261,6 +262,72 @@ describe('WritingCoach', () => {
     renderApp()
     await screen.findByText(ITEM.question)
     expect(wc.report).toHaveBeenCalledWith('p1', 's1')
+  })
+})
+
+describe('Continue where you left off', () => {
+  const UNFINISHED = [
+    { id: 's9', subject: 'language', question: 'Justify how the conflict drives the plot.', created_at: '2026-11-02T15:00:00Z', stage: 'draft_check' },
+  ]
+
+  it('lists unfinished practice on the start page and reopens it', async () => {
+    const onContinue = vi.fn()
+    const user = userEvent.setup()
+    render(<Start reminder={{ ...REMINDER, unfinished: UNFINISHED }} onBegin={() => {}} onHistory={() => {}} onContinue={onContinue} />)
+    const box = screen.getByRole('region', { name: 'Continue where you left off' })
+    expect(within(box).getByText(UNFINISHED[0].question)).toBeInTheDocument()
+    expect(within(box).getByText(/Check the text and mark it/)).toBeInTheDocument()
+    await user.click(within(box).getByRole('button', { name: 'Continue' }))
+    expect(onContinue).toHaveBeenCalledWith('s9')
+  })
+
+  it('needs no ticking to continue, and hides when nothing is unfinished', () => {
+    render(<Start reminder={{ ...REMINDER, unfinished: [] }} onBegin={() => {}} onHistory={() => {}} onContinue={() => {}} />)
+    expect(screen.queryByRole('region', { name: 'Continue where you left off' })).not.toBeInTheDocument()
+  })
+
+  it('opens the chosen practice at its saved text, without marking it automatically', async () => {
+    wc.reminder.mockResolvedValue({ ...REMINDER, unfinished: UNFINISHED })
+    wc.review = vi.fn()
+    wc.report.mockResolvedValue({
+      session: { ...REPORT.session, id: 's9', status: 'started' },
+      submissions: { draft: { id: 'd9', original: 'My saved text', confirmed: 'My saved text', diff: [], word_count: 3, review: null } },
+    })
+    const { user } = renderApp()
+    await screen.findByText(/Before you start/)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('textbox', { name: 'What we read' })).toHaveValue('My saved text')
+    expect(wc.review).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s9')
+  })
+
+  it('after a refresh keeps his place when marking would fail', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.review = vi.fn().mockRejectedValue(new Error('The AI helper ran into a problem.'))
+    wc.report.mockResolvedValue({
+      session: { ...REPORT.session, status: 'started' },
+      submissions: { draft: { id: 'd1', original: 'Saved words', confirmed: 'Saved words', diff: [], word_count: 2, review: null } },
+    })
+    renderApp()
+    expect(await screen.findByRole('textbox', { name: 'What we read' })).toHaveValue('Saved words')
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+  })
+
+  it('does not forget the session on a temporary load failure', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.report.mockRejectedValue(Object.assign(new Error('Server error'), { status: 500 }))
+    renderApp()
+    await screen.findByText(/Before you start/)
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('forgets a session the server no longer has', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 'gone')
+    wc.report.mockRejectedValue(Object.assign(new Error('Session not found'), { status: 404 }))
+    renderApp()
+    await screen.findByText(/Before you start/)
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
   })
 })
 

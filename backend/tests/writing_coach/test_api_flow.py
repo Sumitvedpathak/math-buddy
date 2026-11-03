@@ -138,6 +138,31 @@ async def test_full_session_flow(client, llm, monkeypatch):
     assert (await client.get("/api/v1/wc/reminder", headers=h)).json()["last_next_time"] == "Use two dates"
 
 
+async def test_reminder_lists_unfinished_practice_with_its_stage(client, llm):
+    h, _ = await make_profile(client)
+    unfinished = lambda body: [(u["id"], u["stage"]) for u in body["unfinished"]]  # noqa: E731
+    first = await start_session(client, h)
+    second = await start_session(client, h, "language")
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert unfinished(body) == [(second["id"], "question"), (first["id"], "question")]
+    assert body["unfinished"][0]["question"] == second["item"]["question"]
+
+    sid = first["id"]
+    r = await client.post(f"/api/v1/wc/sessions/{sid}/read", headers=h, json={"kind": "draft", "images": [IMG]})
+    sub = r.json()["submission_id"]
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert dict(unfinished(body))[sid] == "draft_check"
+
+    await client.put(f"/api/v1/wc/submissions/{sub}/transcript", headers=h, json={"text": TRANSCRIPT})
+    await client.post(f"/api/v1/wc/submissions/{sub}/review", headers=h)
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert dict(unfinished(body))[sid] == "draft_report"
+
+    await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "Use two dates"})
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert sid not in dict(unfinished(body))  # finished practice is not offered
+
+
 async def test_rewrite_needs_a_reviewed_draft(client, llm):
     h, _ = await make_profile(client)
     s = await start_session(client, h)

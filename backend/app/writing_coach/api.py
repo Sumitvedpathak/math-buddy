@@ -42,6 +42,7 @@ parent_router = APIRouter(
 )
 
 RECENT_DAYS = 30
+MAX_UNFINISHED = 5  # how many unfinished practices the start page offers
 ERROR_WINDOW = 5  # the personal error tracker looks at his latest 5 reviewed practices
 FOCUS_WEEKS = {
     1: ("Decode, Restate, Answer", "Circle the command word, count the parts, restate the question in your first sentence, and answer every part."),
@@ -245,6 +246,15 @@ def _fixed_summary(draft_rev: WcReview | None, rewrite_sub: WcSubmission | None)
     return check_fixed_errors(_conventions_of(draft_rev).get("errors", []), text)
 
 
+def _stage(subs: dict[str, WcSubmission], reviews: dict[uuid.UUID, WcReview]) -> str:
+    """How far an unfinished practice got, so the start page can say where it continues."""
+    for kind in ("rewrite", "draft"):
+        sub = subs.get(kind)
+        if sub is not None:
+            return f"{kind}_report" if sub.id in reviews else f"{kind}_check"
+    return "question"
+
+
 def _llm_call_failed(exc: LLMServiceError) -> HTTPException:
     return HTTPException(status_code=503, detail=str(exc))
 
@@ -265,7 +275,19 @@ async def reminder(profile: ProfileDep, session: SessionDep):
     sessions, subs, revs = await _list_rows(session, profile.id, limit=20)
     recent = _draft_reviews(sessions, subs, revs)[:ERROR_WINDOW]
     recurring = [e for e in _error_counts(recent) if e["count"] >= 2][:3]
+    unfinished = [
+        {
+            "id": str(s.id),
+            "subject": s.subject,
+            "question": s.item.get("question", ""),
+            "created_at": _iso(s.created_at),
+            "stage": _stage(subs.get(s.id, {}), revs),
+        }
+        for s in sessions
+        if s.status != "done"
+    ][:MAX_UNFINISHED]
     return {
+        "unfinished": unfinished,
         "top_errors": recurring,
         "top_errors_sessions": len(recent),
         "focus_week": settings.focus_week,

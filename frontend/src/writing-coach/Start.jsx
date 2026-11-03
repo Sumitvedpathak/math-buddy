@@ -18,7 +18,41 @@ export const btn =
 export const btnGhost =
   'inline-flex items-center justify-center rounded-md border border-border px-5 py-2.5 text-sm font-medium text-ink hover:bg-muted transition-colors disabled:opacity-40'
 
-export default function Start({ reminder, onBegin, onHistory, busy }) {
+const STAGE_LABEL = {
+  question: 'Answer not written yet',
+  draft_check: 'Check the text and mark it',
+  draft_report: 'See your report, then rewrite',
+  rewrite_check: 'Check your rewrite and mark it',
+  rewrite_report: 'See your rewrite report and the model answer',
+}
+
+const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+
+function ContinueCard({ unfinished, onContinue, busy }) {
+  return (
+    <section className="rounded-2xl bg-card ring-soft p-6" aria-label="Continue where you left off">
+      <h2 className="font-display text-xl font-semibold text-ink">Continue where you left off</h2>
+      <ul className="mt-4 divide-y divide-border list-none p-0">
+        {unfinished.map((u) => (
+          <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="min-w-0 flex-1 basis-64">
+              <p className="font-mono text-xs text-muted-foreground">
+                {dateFmt.format(new Date(u.created_at))} · {SUBJECT_LABEL[u.subject]}
+              </p>
+              <p className="mt-1 text-ink">{u.question}</p>
+              <p className="mt-1 text-sm text-ink-soft">{STAGE_LABEL[u.stage]}</p>
+            </div>
+            <button type="button" className={btnGhost} disabled={busy} onClick={() => onContinue(u.id)}>
+              Continue
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export default function Start({ reminder, onBegin, onHistory, onContinue, busy }) {
   const [subject, setSubject] = useState(reminder.suggested_subject)
   const [schoolQuestion, setSchoolQuestion] = useState('')
   const [ticked, setTicked] = useState(() => CRITERIA.map(() => false))
@@ -30,8 +64,12 @@ export default function Start({ reminder, onBegin, onHistory, busy }) {
       <header>
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">/ Writing Coach</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-ink">Before you start</h1>
-        <p className="mt-3 text-ink-soft">Tick each one to unlock your question.</p>
+        <p className="mt-3 text-ink-soft">Tick each one to unlock a new question.</p>
       </header>
+
+      {reminder.unfinished?.length > 0 && (
+        <ContinueCard unfinished={reminder.unfinished} onContinue={onContinue} busy={busy} />
+      )}
 
       <section className="rounded-2xl bg-card ring-soft p-6 space-y-3" aria-label="This week">
         <h2 className="font-display text-xl font-semibold text-ink">
