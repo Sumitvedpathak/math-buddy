@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { wc } from './wcApi'
 import Report from './Report'
+import ModelAnswer from './ModelAnswer'
 import { CRITERIA_LABELS, SUBJECT_LABEL } from './colours'
 import { btn, btnGhost } from './Start'
 
@@ -100,7 +101,6 @@ function SessionDetail({ profileId, row, onBack }) {
       <section className="rounded-2xl bg-card ring-soft p-6">
         <p className="font-mono text-xs uppercase text-muted-foreground">{SUBJECT_LABEL[session.subject]} · {fmt(session.created_at)}</p>
         <p className="mt-2 font-display text-xl text-ink">{session.item.question}</p>
-        {session.next_time && <p className="mt-3 text-ink-soft">Your goal: “{session.next_time}”</p>}
       </section>
       {hasRewrite && (
         <div role="tablist" className="flex gap-2">
@@ -113,13 +113,7 @@ function SessionDetail({ profileId, row, onBack }) {
         </div>
       )}
       <Report report={report} kind={hasRewrite ? kind : 'draft'} />
-      {session.item.model_answer && (
-        <section className="rounded-2xl bg-card ring-soft p-6">
-          <h2 className="font-display text-xl font-semibold text-ink">Level 4 model answer</h2>
-          <p className="mt-3 whitespace-pre-wrap text-ink-soft">{session.item.model_answer}</p>
-          {session.model_move && <p className="mt-3 text-ink">A move you noticed: {session.model_move}</p>}
-        </section>
-      )}
+      <ModelAnswer profileId={profileId} session={session} />
     </div>
   )
 }

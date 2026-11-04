@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionContext } from '../context/SessionContext'
 import WritingCoach, { stepFromReport } from './WritingCoach'
 import Report from './Report'
 import Start, { CRITERIA } from './Start'
+import ModelAnswer from './ModelAnswer'
 import History from './History'
 import EditPass, { COPS } from './EditPass'
 import WritingCoachPanel from './WritingCoachPanel'
@@ -131,10 +132,10 @@ describe('Start (success criteria)', () => {
     expect(onBegin).toHaveBeenCalledWith('history', '')
   })
 
-  it('shows the focus week and his last goal', () => {
+  it('shows the focus week but no goal to keep', () => {
     render(<Start reminder={REMINDER} onBegin={() => {}} onHistory={() => {}} />)
     expect(screen.getByText(/Week 2 focus: Cite and Explain/)).toBeInTheDocument()
-    expect(screen.getByText(/Use two dates/)).toBeInTheDocument()
+    expect(screen.queryByText(/Use two dates/)).not.toBeInTheDocument()
   })
 
   it('shows the teacher\'s Level 4 column in kid-friendly words', () => {
@@ -276,35 +277,140 @@ describe('Report for an older review', () => {
   })
 })
 
-describe('Model answer button', () => {
-  async function openReport() {
-    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
-    wc.report.mockResolvedValue(REPORT)
-    const { user } = renderApp()
-    return { user, button: await screen.findByRole('button', { name: 'See the model answer' }) }
-  }
+describe('Model answer section', () => {
+  const SESSION = { id: 's1', item: { ...ITEM, extend_hints: ['Go deeper.'] } }
+  const toggle = () => screen.getByRole('button', { name: /Level 4 model answer/ })
 
-  it('asks for it on click, says it is being written, then shows it', async () => {
-    let finish
-    wc.modelAnswer.mockReturnValue(new Promise((resolve) => { finish = resolve }))
-    const { user, button } = await openReport()
+  it('stays closed and costs nothing until he opens it', () => {
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
     expect(wc.modelAnswer).not.toHaveBeenCalled()
-    await user.click(button)
-    expect(wc.modelAnswer).toHaveBeenCalledWith('p1', 's1')
-    expect(await screen.findByRole('button', { name: 'Writing the model answer…' })).toBeDisabled()
-    finish({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
-    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
   })
 
-  it('offers Try again after a failure and keeps him on the report', async () => {
+  it('writes it on the first open, then closes and reopens without asking again', async () => {
+    let done
+    wc.modelAnswer.mockReturnValue(new Promise((resolve) => { done = resolve }))
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    await user.click(toggle())
+    expect(wc.modelAnswer).toHaveBeenCalledWith('p1', 's1')
+    expect(await screen.findByText(/Writing the model answer/)).toBeInTheDocument()
+    done({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
+    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
+    expect(screen.getByText('Go deeper.')).toBeInTheDocument()
+    await user.click(toggle())
+    expect(screen.queryByText('A strong answer.')).not.toBeInTheDocument()
+    await user.click(toggle())
+    expect(screen.getByText('A strong answer.')).toBeInTheDocument()
+    expect(wc.modelAnswer).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a saved answer without asking for a new one', async () => {
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={{ ...SESSION, item: { ...SESSION.item, model_answer: 'Saved answer.' } }} />)
+    await user.click(toggle())
+    expect(screen.getByText('Saved answer.')).toBeInTheDocument()
+    expect(wc.modelAnswer).not.toHaveBeenCalled()
+  })
+
+  it('offers Try again after a failure', async () => {
     wc.modelAnswer.mockRejectedValueOnce(new Error('The AI helper is busy right now.'))
-    wc.modelAnswer.mockResolvedValueOnce({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
-    const { user, button } = await openReport()
-    await user.click(button)
-    expect(await screen.findByText('The AI helper is busy right now.')).toBeInTheDocument()
-    expect(screen.getByText('How you did')).toBeInTheDocument()
+    wc.modelAnswer.mockResolvedValueOnce({ model_answer: 'A strong answer.', extend_hints: [] })
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    await user.click(toggle())
+    expect(await screen.findByRole('alert')).toHaveTextContent('busy right now')
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
+  })
+})
+
+describe('After the results', () => {
+  const UNMARKED = {
+    session: { ...REPORT.session, status: 'started' },
+    submissions: { draft: { id: 'd1', original: 'Saved words', confirmed: 'Saved words', diff: [], word_count: 2, review: null } },
+  }
+
+  /** Reopen a practice waiting to be marked, then mark it, to reach the results. */
+  async function reachResults() {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.confirm = vi.fn().mockResolvedValue({})
+    wc.review = vi.fn().mockResolvedValue({})
+    wc.report.mockResolvedValueOnce(UNMARKED).mockResolvedValue(REPORT)
+    const app = renderApp()
+    await app.user.click(await screen.findByRole('button', { name: 'This is right. Mark it' }))
+    await screen.findByText('How you did')
+    return app
+  }
+
+  it('shows the results with a closed model answer and no form to fill in', async () => {
+    await reachResults()
+    expect(screen.getByRole('button', { name: /Level 4 model answer/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'See the model answer' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save and finish' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/One thing I will do next time/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rewrite it one level higher' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New practice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'My results' })).toBeInTheDocument()
+  })
+
+  it('counts as finished, so coming back opens the start page', async () => {
+    await reachResults()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+  })
+
+  it('opens the start page, not old results, for a practice that was already marked', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.report.mockResolvedValue(REPORT)
+    renderApp()
+    await screen.findByText(/Before you start/)
+    expect(screen.queryByText('How you did')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+  })
+
+  it('New practice goes to the start page', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'New practice' }))
+    expect(await screen.findByText(/Before you start/)).toBeInTheDocument()
+  })
+
+  it('keeps his place if he chose to rewrite and the page reloads', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'Rewrite it one level higher' }))
+    await screen.findByRole('heading', { name: 'Rewrite your answer' })
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+    cleanup()
+    wc.report.mockResolvedValue(REPORT)
+    renderApp()
+    expect(await screen.findByRole('heading', { name: 'Rewrite your answer' })).toBeInTheDocument()
+  })
+
+  it('backing out of a rewrite means he chose not to write it', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'Rewrite it one level higher' }))
+    await user.click(await screen.findByRole('button', { name: /Back to my draft report/ }))
+    await screen.findByText('How you did')
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+    cleanup()
+    renderApp()
+    expect(await screen.findByText(/Before you start/)).toBeInTheDocument()
+  })
+
+  it('does not offer a second rewrite once one has been marked', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.confirm = vi.fn().mockResolvedValue({})
+    wc.review = vi.fn().mockResolvedValue({})
+    const draft = REPORT.submissions.draft
+    const rewrite = { ...draft, id: 'r1', review: REVIEW }
+    wc.report
+      .mockResolvedValueOnce({ ...REPORT, submissions: { draft, rewrite: { ...rewrite, review: null } } })
+      .mockResolvedValue({ ...REPORT, submissions: { draft, rewrite } })
+    const { user } = renderApp()
+    await user.click(await screen.findByRole('button', { name: 'This is right. Mark it' }))
+    await screen.findByText('How you did')
+    await user.click(screen.getByRole('button', { name: /Back to my draft report/ }))
+    await screen.findByText(/Your draft report/)
+    expect(screen.queryByRole('button', { name: 'Rewrite it one level higher' })).not.toBeInTheDocument()
   })
 })
 
@@ -342,7 +448,10 @@ describe('stepFromReport', () => {
     expect(stepFromReport({ ...base, submissions: { draft: sub() } }).step).toBe('confirm')
     expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c' }) } }).step).toBe('confirm')
     expect(stepFromReport({ session: { status: 'started', decode: { parts_correct: true } }, submissions: {} }).step).toBe('write')
-    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c', review: {} }) } })).toEqual({ step: 'report', kind: 'draft' })
+    // reviewed practice is finished, unless he chose to rewrite it
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c', review: {} }) } })).toBeNull()
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }) } }, { rewriting: true })).toEqual({ step: 'write', kind: 'rewrite' })
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }), rewrite: sub({ review: {} }) } }, { rewriting: true })).toBeNull()
     expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }), rewrite: sub() } }).kind).toBe('rewrite')
     expect(stepFromReport({ session: { status: 'done' }, submissions: {} })).toBeNull()
   })

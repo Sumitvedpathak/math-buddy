@@ -28,9 +28,7 @@ export const btnGhost =
 const STAGE_LABEL = {
   question: 'Answer not written yet',
   draft_check: 'Check the text and mark it',
-  draft_report: 'See your report, then rewrite',
   rewrite_check: 'Check your rewrite and mark it',
-  rewrite_report: 'See your rewrite report and the model answer',
 }
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -83,12 +81,6 @@ export default function Start({ reminder, onBegin, onHistory, onContinue, busy }
           Week {reminder.focus_week} focus: {reminder.focus_title}
         </h2>
         <p className="text-ink-soft">{reminder.focus_text}</p>
-        {reminder.last_next_time && (
-          <p className="text-ink">
-            <span className="font-mono text-xs uppercase text-muted-foreground">Last time you said you would</span>
-            <br />“{reminder.last_next_time}”
-          </p>
-        )}
       </section>
 
       {reminder.top_errors?.length > 0 && (

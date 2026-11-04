@@ -255,11 +255,6 @@ class TranscriptUpdate(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
 
 
-class SessionFinish(BaseModel):
-    next_time: str = Field(min_length=1, max_length=500)
-    model_move: str | None = Field(default=None, max_length=500)
-
-
 class SettingsUpdate(BaseModel):
     history_strand: Literal["A", "B", "both"] | None = None
     focus_week: int | None = Field(default=None, ge=1, le=4)

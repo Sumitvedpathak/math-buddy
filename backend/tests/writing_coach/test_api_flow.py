@@ -123,9 +123,6 @@ async def test_full_session_flow(client, llm, monkeypatch):
     rw_id = rw.json()["submission_id"]
     await client.put(f"/api/v1/wc/submissions/{rw_id}/transcript", headers=h, json={"text": fixed})
     assert (await client.post(f"/api/v1/wc/submissions/{rw_id}/review", headers=h)).status_code == 200
-    fin = await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "Use two dates", "model_move": "It links to today"})
-    assert fin.status_code == 200 and fin.json()["status"] == "done"
-
     # his report and overview
     rep = (await client.get(f"/api/v1/wc/sessions/{sid}/report", headers=h)).json()
     assert rep["submissions"]["draft"]["diff"] and rep["submissions"]["rewrite"]["review"]["level"] == "3-"
@@ -136,8 +133,9 @@ async def test_full_session_flow(client, llm, monkeypatch):
     assert ov["session_count"] == 1 and ov["criteria"][0]["key"] == "evidence"
     assert ov["command_words_missed"] == [["explain", 1]]
 
-    # next session's reminder carries his last goal
-    assert (await client.get("/api/v1/wc/reminder", headers=h)).json()["last_next_time"] == "Use two dates"
+    # there is nothing to save at the end: goals and the finish step are gone
+    assert (await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "x"})).status_code == 405
+    assert "last_next_time" not in (await client.get("/api/v1/wc/reminder", headers=h)).json()
 
 
 async def test_reminder_lists_unfinished_practice_with_its_stage(client, llm):
@@ -158,11 +156,18 @@ async def test_reminder_lists_unfinished_practice_with_its_stage(client, llm):
     await client.put(f"/api/v1/wc/submissions/{sub}/transcript", headers=h, json={"text": TRANSCRIPT})
     await client.post(f"/api/v1/wc/submissions/{sub}/review", headers=h)
     body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert dict(unfinished(body))[sid] == "draft_report"
+    assert sid not in dict(unfinished(body))  # a reviewed practice is finished, with or without a rewrite
 
-    await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "Use two dates"})
+    # a rewrite he has photographed but not had marked is pending again
+    rw = await client.post(f"/api/v1/wc/sessions/{sid}/read", headers=h, json={"kind": "rewrite", "images": [IMG]})
+    rw_id = rw.json()["submission_id"]
     body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert sid not in dict(unfinished(body))  # finished practice is not offered
+    assert dict(unfinished(body))[sid] == "rewrite_check"
+
+    await client.put(f"/api/v1/wc/submissions/{rw_id}/transcript", headers=h, json={"text": TRANSCRIPT})
+    await client.post(f"/api/v1/wc/submissions/{rw_id}/review", headers=h)
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert sid not in dict(unfinished(body))
 
 
 async def test_rewrite_needs_a_reviewed_draft(client, llm):

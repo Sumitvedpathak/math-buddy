@@ -23,7 +23,6 @@ from app.writing_coach.schemas import (
     DecodeAnswer,
     ReadRequest,
     SessionCreate,
-    SessionFinish,
     SettingsUpdate,
     TranscriptUpdate,
     word_count,
@@ -44,6 +43,8 @@ parent_router = APIRouter(
 
 RECENT_DAYS = 30
 MAX_UNFINISHED = 5  # how many unfinished practices the start page offers
+# A practice is finished once its results are shown, whether or not he rewrites it.
+PENDING_STAGES = {"question", "draft_check", "rewrite_check"}
 ERROR_WINDOW = 5  # the personal error tracker looks at his latest 5 reviewed practices
 TREND_WINDOW = 10  # the parent's criteria table shows his latest 10 drafts
 FOCUS_WEEKS = {
@@ -152,8 +153,6 @@ def session_out(row: WcSession, *, with_model_answer: bool) -> dict:
         "focus_week": row.focus_week,
         "decode": row.decode,
         "status": row.status,
-        "next_time": row.next_time,
-        "model_move": row.model_move,
         "created_at": _iso(row.created_at),
         "completed_at": _iso(row.completed_at),
     }
@@ -277,12 +276,6 @@ def _llm_call_failed(exc: LLMServiceError) -> HTTPException:
 @router.get("/reminder")
 async def reminder(profile: ProfileDep, session: SessionDep):
     settings = await get_settings_row(session, profile.id)
-    last = await session.scalar(
-        select(WcSession)
-        .where(WcSession.profile_id == profile.id, WcSession.next_time.is_not(None))
-        .order_by(WcSession.created_at.desc())
-        .limit(1)
-    )
     subject, rest = suggested_subject()
     title, text = FOCUS_WEEKS[settings.focus_week]
     sessions, subs, revs = await _list_rows(session, profile.id, limit=20)
@@ -297,7 +290,7 @@ async def reminder(profile: ProfileDep, session: SessionDep):
             "stage": _stage(subs.get(s.id, {}), revs),
         }
         for s in sessions
-        if s.status != "done"
+        if s.status != "done" and _stage(subs.get(s.id, {}), revs) in PENDING_STAGES
     ][:MAX_UNFINISHED]
     return {
         "unfinished": unfinished,
@@ -306,7 +299,6 @@ async def reminder(profile: ProfileDep, session: SessionDep):
         "focus_week": settings.focus_week,
         "focus_title": title,
         "focus_text": text,
-        "last_next_time": last.next_time if last else None,
         "suggested_subject": subject,
         "is_rest_day": rest,
         "history_strand": settings.history_strand,
@@ -493,19 +485,6 @@ async def model_answer(session_id: uuid.UUID, profile: ProfileDep, session: Sess
         row.item = {**row.item, "model_answer": answer}  # reassigned so the JSON column saves
         await session.commit()
     return {"model_answer": answer, "extend_hints": row.item["extend_hints"]}
-
-
-@router.patch("/sessions/{session_id}")
-async def finish_session(session_id: uuid.UUID, data: SessionFinish, profile: ProfileDep, session: SessionDep):
-    row = await owned_session(session, session_id, profile.id)
-    if not await model_answer_unlocked(session, row.id):
-        raise HTTPException(status_code=409, detail="Finish the draft review first.")
-    row.next_time = data.next_time.strip()
-    row.model_move = (data.model_move or "").strip() or None
-    row.status = "done"
-    row.completed_at = datetime.now(timezone.utc)
-    await session.commit()
-    return session_out(row, with_model_answer=True)
 
 
 @router.get("/sessions/{session_id}/report")
