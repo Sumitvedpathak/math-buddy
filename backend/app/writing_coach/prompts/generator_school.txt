@@ -11,7 +11,6 @@ Write:
 5. "background": 60 to 100 words telling the student what the question is really asking and what a strong answer needs to include. Do not state facts you are unsure about. If the question needs knowledge or a text you do not have, say so plainly.
 6. "key_terms": 4 to 6 subject words that would help in an answer.
 7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea.
-8. "model_answer": a 5 to 7 sentence example of the SHAPE of a Level 4 answer (restate, answer every part, two pieces of evidence, explain each, extend). Where the answer needs facts or quotes you do not have, write short placeholders in square brackets such as [a detail from your notes]. Never invent facts.
-9. "text_kind": "card".
+8. "text_kind": "card".
 
-Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, text_kind.

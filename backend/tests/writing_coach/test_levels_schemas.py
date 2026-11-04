@@ -68,8 +68,6 @@ def test_review_drops_tags_not_found_in_transcript():
 def test_generated_item_validates_lengths():
     GeneratedItem.model_validate(GOOD_ITEM)
     with pytest.raises(ValidationError):
-        GeneratedItem.model_validate({**GOOD_ITEM, "model_answer": "Too short."})
-    with pytest.raises(ValidationError):
         GeneratedItem.model_validate({**GOOD_ITEM, "key_terms": ["a", "b"]})
 
 

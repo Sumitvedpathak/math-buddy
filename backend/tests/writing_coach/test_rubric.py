@@ -8,10 +8,10 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.writing_coach.rubric import RUBRIC, sentence_stats
-from app.writing_coach.schemas import GeneratedItem, Review
+from app.writing_coach.schemas import ModelAnswer, Review
 from tests.conftest import ADMIN_TOKEN
 
-from .samples import GOOD_ITEM, GOOD_REVIEW, OLD_REVIEW, criteria
+from .samples import GOOD_ITEM, GOOD_REVIEW, MODEL_REPLY, OLD_REVIEW, criteria
 from .test_api_flow import IMG, make_profile, start_session
 
 ERR_PLACE = {"original": "grand river", "correction": "Grand River", "type": "capitalization",
@@ -129,23 +129,22 @@ def test_the_app_overrides_the_models_counts_and_drops_errors_not_in_the_answer(
     assert [e.original for e in comm.errors] == ["grand river"]
 
 
-# ---- model answers follow the same target
+# ---- model answers are written on request, against the same rubric
 
 @pytest.mark.parametrize("sentences,ok", [(3, False), (4, True), (5, True), (7, True), (8, True), (9, False)])
 def test_model_answer_is_checked_in_sentences(sentences, ok):
-    body = {**GOOD_ITEM, "model_answer": "A complete sentence goes here. " * sentences}
+    body = {"model_answer": "A complete sentence goes here. " * sentences}
     if ok:
-        GeneratedItem.model_validate(body)
+        ModelAnswer.model_validate(body)
     else:
         with pytest.raises(ValidationError):
-            GeneratedItem.model_validate(body)
+            ModelAnswer.model_validate(body)
 
 
-def test_generators_ask_for_the_sentence_target_not_a_word_count():
+def test_generators_no_longer_write_a_model_answer():
     prompts = Path(__file__).parents[2] / "app" / "writing_coach" / "prompts"
     for name in ("generator_history.txt", "generator_language.txt", "generator_school.txt"):
-        text = (prompts / name).read_text(encoding="utf-8")
-        assert "5 to 7" in text and "150 to 250" not in text
+        assert "model_answer" not in (prompts / name).read_text(encoding="utf-8")
 
 
 # ---- the rubric itself and the prompt
@@ -165,7 +164,10 @@ def test_rubric_keeps_the_pdf_wording():
 
 @pytest.fixture
 def llm(monkeypatch):
-    state = {"review": GOOD_REVIEW, "prompts": [], "transcript": "They settled on the grand river. They stayed."}
+    state = {
+        "review": GOOD_REVIEW, "prompts": [], "transcript": "They settled on the grand river. They stayed.",
+        "model_prompts": [], "model_calls": [], "model_reply": MODEL_REPLY,
+    }
 
     async def fake(prompt, images=None, *, model=None, temperature=None):
         usage = {"model": model, "input_tokens": 1, "output_tokens": 1}
@@ -174,6 +176,10 @@ def llm(monkeypatch):
         if "marking a written answer" in prompt:
             state["prompts"].append(prompt)
             return state["review"], usage
+        if "writing a Level 4 model answer" in prompt:
+            state["model_prompts"].append(prompt)
+            state["model_calls"].append({"model": model, "temperature": temperature})
+            return state["model_reply"], usage
         return GOOD_ITEM, usage
 
     monkeypatch.setattr("app.writing_coach.agents.call_llm_with_usage", fake)
@@ -269,6 +275,99 @@ async def test_settings_no_longer_accept_a_rubric(client, llm, admin_token):
     r = await client.put(f"/api/v1/wc/parent/settings?profile_id={pid}", headers={"X-Admin-Token": ADMIN_TOKEN},
                          json={"history_strand": "B", "focus_week": 3, "rubric_override": "ignored"})
     assert r.json() == {"history_strand": "B", "focus_week": 3}
+
+
+# ---- the model answer, written when he asks for it
+
+def model_url(sid):
+    return f"/api/v1/wc/sessions/{sid}/model-answer"
+
+
+async def test_a_new_session_has_no_model_answer_until_he_asks(client, llm, monkeypatch):
+    monkeypatch.setenv("WC_REVIEWER_MODEL", "rev/model")
+    h, _ = await make_profile(client)
+    s = await start_session(client, h)
+    assert llm["model_calls"] == []
+    assert (await client.post(model_url(s["id"]), headers=h)).status_code == 403  # locked until the draft is reviewed
+    await run_review(client, h, s["id"], llm)
+    assert llm["model_calls"] == []  # reviewing does not write one either
+
+    r = await client.post(model_url(s["id"]), headers=h)
+    assert r.status_code == 200
+    assert r.json()["model_answer"].startswith("This is one complete sentence")
+    assert r.json()["extend_hints"] == GOOD_ITEM["extend_hints"]
+    assert llm["model_calls"][0]["model"] == "rev/model"
+
+
+async def test_the_model_answer_is_written_once_and_saved(client, llm):
+    h, _ = await make_profile(client)
+    s = await start_session(client, h)
+    await run_review(client, h, s["id"], llm)
+    first = (await client.post(model_url(s["id"]), headers=h)).json()
+    second = (await client.post(model_url(s["id"]), headers=h)).json()
+    assert first == second and len(llm["model_calls"]) == 1
+    # saved for My results too
+    rep = (await client.get(f"/api/v1/wc/sessions/{s['id']}/report", headers=h)).json()
+    assert rep["session"]["item"]["model_answer"] == first["model_answer"]
+
+
+async def test_older_sessions_keep_their_saved_model_answer(client, llm):
+    from app.db import get_session
+    from app.main import app
+    from app.models.tables import WcSession
+
+    h, _ = await make_profile(client)
+    s = await start_session(client, h)
+    await run_review(client, h, s["id"], llm)
+    async for db in app.dependency_overrides[get_session]():
+        row = await db.scalar(select(WcSession))
+        row.item = {**row.item, "model_answer": "An older saved answer."}
+        await db.commit()
+    r = await client.post(model_url(s["id"]), headers=h)
+    assert r.json()["model_answer"] == "An older saved answer." and llm["model_calls"] == []
+
+
+async def test_a_failed_model_answer_can_be_tried_again(client, llm):
+    h, _ = await make_profile(client)
+    s = await start_session(client, h)
+    await run_review(client, h, s["id"], llm)
+    llm["model_reply"] = {"model_answer": "Too short."}
+    assert (await client.post(model_url(s["id"]), headers=h)).status_code == 503
+    llm["model_reply"] = MODEL_REPLY
+    assert (await client.post(model_url(s["id"]), headers=h)).status_code == 200
+
+
+async def test_history_model_answer_uses_only_the_stored_facts(client, llm):
+    from app.writing_coach.agents import history_topics
+
+    h, _ = await make_profile(client)
+    s = await start_session(client, h)
+    await run_review(client, h, s["id"], llm)
+    await client.post(model_url(s["id"]), headers=h)
+    prompt = llm["model_prompts"][0]
+    topic = next(t for t in history_topics("both") if t["id"] == s["topic_id"])
+    assert all(fact in prompt for fact in topic["key_facts"])
+    assert "ONLY facts you may state" in prompt
+    assert "Demonstrates thorough understanding of the text." in prompt  # the rubric's Level 4 wording
+    assert "double quotation marks" in prompt
+
+
+async def test_language_model_answer_and_review_see_the_practice_text(client, llm):
+    h, _ = await make_profile(client)
+    s = await start_session(client, h, "language")
+    await run_review(client, h, s["id"], llm)
+    await client.post(model_url(s["id"]), headers=h)
+    assert GOOD_ITEM["background"] in llm["model_prompts"][0]
+    assert GOOD_ITEM["background"] in llm["prompts"][0]
+
+
+async def test_school_model_answer_uses_placeholders_not_invented_facts(client, llm):
+    h, _ = await make_profile(client)
+    s = await start_session(client, h, "school", school_question="Why did the Loyalists leave?")
+    await run_review(client, h, s["id"], llm)
+    await client.post(model_url(s["id"]), headers=h)
+    prompt = llm["model_prompts"][0]
+    assert "Why did the Loyalists leave?" in prompt and "placeholders" in prompt and "Never invent facts" in prompt
 
 
 # ---- older reviews stay readable

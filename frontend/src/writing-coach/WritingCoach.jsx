@@ -352,7 +352,7 @@ export default function WritingCoach() {
               </button>
             )}
             <button type="button" className={kind === 'draft' ? btnGhost : btn} disabled={busy} onClick={openModel}>
-              See the model answer
+              {busy ? 'Writing the model answer…' : error ? 'Try again' : 'See the model answer'}
             </button>
           </div>
         </div>

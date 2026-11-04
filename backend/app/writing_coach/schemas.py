@@ -38,7 +38,6 @@ class GeneratedItem(BaseModel):
     background: str = Field(min_length=40)
     key_terms: list[str] = Field(min_length=4, max_length=6)
     extend_hints: list[str] = Field(min_length=2, max_length=3)
-    model_answer: str
     text_kind: Literal["card", "novel", "poem", "media"] = "card"
 
     @field_validator("command_words")
@@ -48,6 +47,12 @@ class GeneratedItem(BaseModel):
         if not out:
             raise ValueError("at least one command word")
         return out
+
+
+class ModelAnswer(BaseModel):
+    """The Level 4 model answer, written when the student asks for it."""
+
+    model_answer: str
 
     @field_validator("model_answer")
     @classmethod

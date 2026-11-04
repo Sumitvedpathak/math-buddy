@@ -3,7 +3,7 @@ import pytest
 from app.integrations.langchainrouter import LLMServiceError
 from tests.conftest import ADMIN_TOKEN
 
-from .samples import GOOD_ITEM, GOOD_REVIEW
+from .samples import GOOD_ITEM, GOOD_REVIEW, MODEL_REPLY
 
 TRANSCRIPT = "The Acadians were deprted in 1755. Governor Lawrence ordered it. [illegible] lost farms."
 IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
@@ -21,6 +21,8 @@ def llm(monkeypatch):
             return {"transcript": TRANSCRIPT}, usage
         if "marking a written answer" in prompt:
             return GOOD_REVIEW, usage
+        if "writing a Level 4 model answer" in prompt:
+            return MODEL_REPLY, usage
         return GOOD_ITEM, usage
 
     monkeypatch.setattr("app.writing_coach.agents.call_llm_with_usage", fake)
@@ -94,7 +96,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
 
     # review before confirming is refused; model answer is locked
     assert (await client.post(f"/api/v1/wc/submissions/{sub_id}/review", headers=h)).status_code == 409
-    assert (await client.get(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 403
+    assert (await client.post(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 403
 
     # he may fix a misread word but not add content
     big = TRANSCRIPT + " and a lot of brand new sentences he did not write on paper at all"
@@ -113,7 +115,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
     assert review_call["model"] == "rev/model"
 
     # model answer unlocks after the draft review; editing a reviewed answer is refused
-    assert (await client.get(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 200
+    assert (await client.post(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 200
     assert (await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})).status_code == 409
 
     # rewrite, then log the goal

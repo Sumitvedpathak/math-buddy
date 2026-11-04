@@ -21,7 +21,6 @@ Write:
 5. "background": a short background card (60 to 110 words) written from the facts above for a 12-year-old.
 6. "key_terms": 4 to 6 terms from the key terms list.
 7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea (another group's view, a link to today, short-term versus long-term effects).
-8. "model_answer": a Level 4 model answer of 5 to 7 complete sentences, with varied sentence openings, that restates the question, answers every part, cites at least two specific pieces of evidence from the facts, explains how each proves the point, and extends with a deeper idea. Use at least two key terms.
-9. "text_kind": "card".
+8. "text_kind": "card".
 
-Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, text_kind.

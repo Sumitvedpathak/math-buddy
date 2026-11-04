@@ -13,7 +13,12 @@ THE TEACHER'S RUBRIC. Use it exactly. Score each of the three criteria on its ow
 {{ c.name }} ("{{ c.key }}"):
 {% for n in ["1", "2", "3", "4"] %}- Level {{ n }}: {{ c.levels[n] }}
 {% endfor %}{% endfor %}
-{% if subject == "language" %}EVIDENCE IN THIS SUBJECT: quotes or specific details from the text. For novel questions the student may use their own class novel. Do not lower marks for not using the practice text.
+{% if subject == "language" %}THE PRACTICE TEXT the student was given:
+"""
+{{ background }}
+"""
+Use it to check quotes and details. A quote not found here may come from the student's own class novel.
+{% endif %}{% if subject == "language" %}EVIDENCE IN THIS SUBJECT: quotes or specific details from the text. For novel questions the student may use their own class novel. Do not lower marks for not using the practice text.
 {% else %}EVIDENCE IN THIS SUBJECT: where the rubric says "the text", read it as the subject being studied. Evidence = quotes from the source or specific facts (names, dates, numbers).
 {% endif %}
 WRITTEN COMMUNICATION also includes spelling, capitalization (proper nouns!), punctuation, and fragments or run-ons.

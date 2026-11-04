@@ -46,7 +46,7 @@ export const wc = {
     request('PUT', `/submissions/${submissionId}/transcript`, { profileId, body: { text } }),
   review: (profileId, submissionId) =>
     request('POST', `/submissions/${submissionId}/review`, { profileId }),
-  modelAnswer: (profileId, id) => request('GET', `/sessions/${id}/model-answer`, { profileId }),
+  modelAnswer: (profileId, id) => request('POST', `/sessions/${id}/model-answer`, { profileId }),
   finish: (profileId, id, body) => request('PATCH', `/sessions/${id}`, { profileId, body }),
   overview: (profileId) => request('GET', '/overview', { profileId }),
 }

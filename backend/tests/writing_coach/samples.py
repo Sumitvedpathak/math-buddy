@@ -1,6 +1,7 @@
 """Shared fixtures for the Writing Coach tests. The sample answers are written for the tests."""
 
 MODEL_ANSWER = "This is one complete sentence of the model answer. " * 6
+MODEL_REPLY = {"model_answer": MODEL_ANSWER}
 
 GOOD_ITEM = {
     "question": "Explain why the Expulsion of the Acadians in 1755 was a turning point.",
@@ -10,7 +11,6 @@ GOOD_ITEM = {
     "background": "In 1755 British officials ordered Acadians to leave Nova Scotia. Thousands were put on ships.",
     "key_terms": ["Acadian", "Expulsion", "deportation", "Mi'kmaw"],
     "extend_hints": ["Think about the Mi'kmaw view.", "Link to refugees today."],
-    "model_answer": MODEL_ANSWER,
     "text_kind": "card",
 }
 

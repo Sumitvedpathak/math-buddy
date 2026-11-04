@@ -477,12 +477,22 @@ async def review_submission(submission_id: uuid.UUID, profile: ProfileDep, sessi
     return review_out(rev)
 
 
-@router.get("/sessions/{session_id}/model-answer")
+@router.post("/sessions/{session_id}/model-answer")
 async def model_answer(session_id: uuid.UUID, profile: ProfileDep, session: SessionDep):
+    """Written the first time he asks, then saved. Older sessions already have one saved."""
     row = await owned_session(session, session_id, profile.id)
     if not await model_answer_unlocked(session, row.id):
         raise HTTPException(status_code=403, detail="Finish the draft review first.")
-    return {"model_answer": row.item["model_answer"], "extend_hints": row.item["extend_hints"]}
+    answer = row.item.get("model_answer")
+    if not answer:
+        topic = agents.history_topic(row.topic_id) if row.subject == "history" else None
+        try:
+            answer = await agents.write_model_answer(subject=row.subject, item=row.item, topic=topic)
+        except LLMServiceError as exc:
+            raise _llm_call_failed(exc) from exc
+        row.item = {**row.item, "model_answer": answer}  # reassigned so the JSON column saves
+        await session.commit()
+    return {"model_answer": answer, "extend_hints": row.item["extend_hints"]}
 
 
 @router.patch("/sessions/{session_id}")

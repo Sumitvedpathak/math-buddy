@@ -14,7 +14,7 @@ import { wc, wcParent } from './wcApi'
 vi.mock('./wcApi', () => ({
   wc: {
     reminder: vi.fn(), createSession: vi.fn(), decode: vi.fn(), report: vi.fn(),
-    listSessions: vi.fn(), overview: vi.fn(),
+    listSessions: vi.fn(), overview: vi.fn(), modelAnswer: vi.fn(),
   },
   wcParent: { sessions: vi.fn(), progress: vi.fn(), getSettings: vi.fn(), putSettings: vi.fn() },
 }))
@@ -273,6 +273,38 @@ describe('Report for an older review', () => {
   it('copes with the oldest reviews that have no conventions block', () => {
     render(<Report report={withReview({ ...OLD_REVIEW, conventions: [] })} kind="draft" />)
     expect(screen.queryByRole('region', { name: 'Conventions' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Model answer button', () => {
+  async function openReport() {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.report.mockResolvedValue(REPORT)
+    const { user } = renderApp()
+    return { user, button: await screen.findByRole('button', { name: 'See the model answer' }) }
+  }
+
+  it('asks for it on click, says it is being written, then shows it', async () => {
+    let finish
+    wc.modelAnswer.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const { user, button } = await openReport()
+    expect(wc.modelAnswer).not.toHaveBeenCalled()
+    await user.click(button)
+    expect(wc.modelAnswer).toHaveBeenCalledWith('p1', 's1')
+    expect(await screen.findByRole('button', { name: 'Writing the model answer…' })).toBeDisabled()
+    finish({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
+    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
+  })
+
+  it('offers Try again after a failure and keeps him on the report', async () => {
+    wc.modelAnswer.mockRejectedValueOnce(new Error('The AI helper is busy right now.'))
+    wc.modelAnswer.mockResolvedValueOnce({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
+    const { user, button } = await openReport()
+    await user.click(button)
+    expect(await screen.findByText('The AI helper is busy right now.')).toBeInTheDocument()
+    expect(screen.getByText('How you did')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
   })
 })
 
