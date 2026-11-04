@@ -82,7 +82,7 @@ function Overview({ overview }) {
   )
 }
 
-function SessionDetail({ profileId, row, onBack }) {
+function SessionDetail({ profileId, row, onBack, onRewrite }) {
   const [report, setReport] = useState(null)
   const [kind, setKind] = useState('draft')
   const [error, setError] = useState(null)
@@ -114,11 +114,14 @@ function SessionDetail({ profileId, row, onBack }) {
       )}
       <Report report={report} kind={hasRewrite ? kind : 'draft'} />
       <ModelAnswer profileId={profileId} session={session} />
+      {!report.submissions.rewrite && (
+        <button type="button" className={btn} onClick={() => onRewrite(report)}>Rewrite it one level higher</button>
+      )}
     </div>
   )
 }
 
-export default function History({ profileId, onBack, onNew }) {
+export default function History({ profileId, onBack, onNew, onRewrite }) {
   const [rows, setRows] = useState(null)
   const [overview, setOverview] = useState(null)
   const [error, setError] = useState(null)
@@ -146,7 +149,7 @@ export default function History({ profileId, onBack, onNew }) {
       {error && <p role="alert" className="text-destructive">{error}</p>}
       {!rows && !error && <p className="text-ink-soft">Loading…</p>}
 
-      {rows && open && <SessionDetail profileId={profileId} row={open} onBack={() => setOpen(null)} />}
+      {rows && open && <SessionDetail profileId={profileId} row={open} onBack={() => setOpen(null)} onRewrite={onRewrite} />}
 
       {rows && !open && (
         <>

@@ -220,6 +220,16 @@ export default function WritingCoach() {
     setStep('question')
   }
 
+  /** He chose to rewrite a marked practice, from its results or from My results. */
+  function startRewrite(r) {
+    rememberRewriting(r.session.id)
+    setReport(r)
+    setSession(r.session)
+    setKind('rewrite')
+    setImages(null)
+    setStep('write')
+  }
+
   async function readPhotos(imgs) {
     const res = await run(() => wc.read(profileId, session.id, kind, imgs))
     if (!res) return
@@ -262,7 +272,7 @@ export default function WritingCoach() {
       )
     case 'history':
       return (
-        <History profileId={profileId} onBack={goToStart} onNew={goToStart} />
+        <History profileId={profileId} onBack={goToStart} onNew={goToStart} onRewrite={startRewrite} />
       )
     case 'question':
       return (
@@ -355,7 +365,7 @@ export default function WritingCoach() {
               <button
                 type="button"
                 className={btn}
-                onClick={() => { rememberRewriting(report.session.id); setKind('rewrite'); setImages(null); setStep('write') }}
+                onClick={() => startRewrite(report)}
               >
                 Rewrite it one level higher
               </button>

@@ -415,6 +415,51 @@ describe('After the results', () => {
 })
 
 describe('My results', () => {
+  const ROW = { id: 's1', created_at: '2026-11-02T15:00:00Z', subject: 'history', question: 'Why did X?', draft: { level: '2+', percent: 69 }, rewrite: null }
+  const emptyOverview = {
+    session_count: 1, recent_count: 1, sessions_with_missed_parts: 0, command_words_missed: [],
+    top_errors: [], timeline: [], average_sentence_count: 4, criteria: [],
+  }
+  const historyReport = { ...REPORT, session: { ...REPORT.session, created_at: '2026-11-02T15:00:00Z' } }
+
+  async function openPastPractice(onRewrite, report = historyReport) {
+    wc.listSessions.mockResolvedValue([ROW])
+    wc.overview.mockResolvedValue(emptyOverview)
+    wc.report.mockResolvedValue(report)
+    const user = userEvent.setup()
+    render(<History profileId="p1" onBack={() => {}} onNew={() => {}} onRewrite={onRewrite} />)
+    await user.click(await screen.findByRole('button', { name: /Why did X\?/ }))
+    await screen.findByText('Back to my results')
+    return user
+  }
+
+  it('offers a rewrite on a past practice that has none', async () => {
+    const onRewrite = vi.fn()
+    const user = await openPastPractice(onRewrite)
+    await user.click(await screen.findByRole('button', { name: 'Rewrite it one level higher' }))
+    expect(onRewrite).toHaveBeenCalledWith(historyReport)
+  })
+
+  it('does not offer a rewrite once one exists', async () => {
+    const rewrite = { ...REPORT.submissions.draft, id: 'r1', review: null }
+    await openPastPractice(vi.fn(), { ...historyReport, submissions: { ...REPORT.submissions, rewrite } })
+    expect(screen.queryByRole('button', { name: 'Rewrite it one level higher' })).not.toBeInTheDocument()
+  })
+
+  it('opens the rewrite step from My results and remembers it', async () => {
+    wc.listSessions.mockResolvedValue([ROW])
+    wc.overview.mockResolvedValue(emptyOverview)
+    wc.report.mockResolvedValue(historyReport)
+    const { user } = renderApp()
+    await user.click(await screen.findByRole('button', { name: 'My results' }))
+    await user.click(await screen.findByRole('button', { name: /Why did X\?/ }))
+    await user.click(await screen.findByRole('button', { name: 'Rewrite it one level higher' }))
+    expect(await screen.findByRole('heading', { name: 'Rewrite your answer' })).toBeInTheDocument()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+    expect(window.localStorage.getItem('mathBuddy.wc.rewriting')).toBe('s1')
+    expect(screen.getByRole('button', { name: /Back to my draft report/ })).toBeInTheDocument()
+  })
+
   const OVERVIEW = {
     session_count: 2, recent_count: 2, sessions_with_missed_parts: 0, command_words_missed: [],
     top_errors: [], timeline: [], average_sentence_count: 4,
