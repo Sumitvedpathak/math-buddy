@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Grade 7 Curriculum Tracking
 
 - **Data**: `profiles`, `lesson_progress` (derived; best score never regresses; `completed` once best ≥ 95%, sticky), `practice_attempts` (append-only history for curriculum *and* free practice). Migrations: `cd backend && alembic upgrade head` (needs `MATH_BUDDY_DATABASE_URL`; local Postgres via `docker compose up db`).
-- **Curriculum**: static `backend/app/data/curriculum.json` (all 10 units / 58 lessons, grade 7). Edit the file + redeploy to change it.
+- **Curriculum**: static `backend/app/curriculum/data/curriculum.json` (all 10 units / 58 lessons, grade 7). Edit the file + redeploy to change it.
 - **Child API**: `GET /profiles/lookup` (read-only), `POST /profiles`, `GET /curriculum`, `POST /attempts`, `GET /profiles/{id}/lesson-status` (no timestamps/history by design). `POST /questions/generate` accepts optional `lesson_id` → lesson-scoped prompt, `problem_type: "lesson"`.
 - **Admin API**: `/api/v1/admin/*`, header `X-Admin-Token` = `MATH_BUDDY_ADMIN_TOKEN` (generate with `python backend/scripts/generate_admin_token.py`). Any auth failure is a generic 404; hidden from `/docs`. Frontend page: `/admin/<token>` (separate route tree in `main.jsx`, never linked from the child app). This is a placeholder for real login — swap only `require_admin` in `backend/app/api/deps.py`.
 - **Frontend flow**: `profile` screen first (email lookup → confirm-before-create → identity-only `localStorage` cache `mathBuddy.profile`) → grade sets `ageGroup` (6→`9-10`, 7→`11-12`) and hides the manual selector. Grade 7 also gets `CurriculumPicker` in the setup stage; lessons are a fixed 25 questions (`CURRICULUM_QUESTION_COUNT`). After evaluation the attempt is saved in the background (`saveAttemptWithRetry`: one retry, then a non-blocking banner). Free-practice attempts store `topic_id` as the sorted selected topic IDs joined with `+`.
@@ -24,14 +24,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Writing Coach (temporary; grade 7 son only)
 
 Written-answer practice for Language and History, marked against the Ontario achievement chart. **Photos are never stored**: the browser compresses/strips EXIF, the Reader agent reads them in memory, only the verbatim transcript (original + confirmed + word diff) and the review are saved.
-- **Backend**: `backend/app/writing_coach/` (self-contained). Three agents in `agents.py` (Generator, Reader, Reviewer): Jinja2 prompts in `writing_coach/prompts/`, pydantic schemas, one retry with a repair note. Per-agent models via env `WC_GENERATOR_MODEL`, `WC_READER_MODEL` (must accept images), `WC_REVIEWER_MODEL` (fall back to `MATH_BUDDY_OPENROUTER_MODEL`). Reader temp 0, Reviewer 0.1. `call_llm_with_usage` in `langchainrouter.py` adds per-call model/temperature + token counts (token counts are logged, never content).
+- **Backend**: `backend/app/writing_coach/` (self-contained). Three agents in `agents.py` (Generator, Reader, Reviewer): Jinja2 prompts in `writing_coach/prompts/`, pydantic schemas, one retry with a repair note. Per-agent models via env `WC_GENERATOR_MODEL`, `WC_READER_MODEL` (must accept images), `WC_REVIEWER_MODEL` (fall back to `MATH_BUDDY_OPENROUTER_MODEL`). Reader temp 0, Reviewer 0.1. `call_llm_with_usage` in `core/llm.py` adds per-call model/temperature + token counts (token counts are logged, never content).
+- **Model answer**: not written by the Generator. `POST /wc/sessions/{id}/model-answer` writes it the first time he opens the section (after the draft review), with the Reviewer's model and its own prompt `model_answer.txt` (the rubric's Level 4, stored History facts or the Language practice text, placeholders for school questions), then saves it in `item.model_answer`. Older sessions keep the one already saved. A separate call from marking, so it does not affect marks.
 - **Facts**: History questions are written ONLY from `writing_coach/data/history_strand_{a,b}.json` (**drafts, need parent review**). Language types in `language_types.json`.
-- **API**: all under `/api/v1/wc/`. Student routes need header `X-Profile-Id` (a grade 7 profile). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, and settings: strand, teacher rubric, focus week).
+- **API**: all under `/api/v1/wc/`. Student routes need header `X-Profile-Id` (a grade 7 profile). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, the three-criteria trend, and settings: strand, focus week).
 - **Tables** (`wc_settings`, `wc_sessions`, `wc_submissions`, `wc_reviews`, migration `0002`). Levels: `levels.py` (1- to 4+, percent bands; the Reviewer's level wins, percent is clamped into its band). A correction may fix misread words but not add content (`transcript.py`).
-- **Conventions** (marked in EVERY review, any subject): the Reviewer scores them 0-2 and lists up to 10 errors (original, correction, type, category, rule). `level`/`percent` from the model are CONTENT only; `Review.apply_conventions()` steps the level down 0/1/2 (never below 1-) and keeps `contentLevel`. Errors not found verbatim in the transcript, or on a word the Reader marked `[?]` (ambiguous capital), are dropped. The Reader copies spelling/capitals exactly; at the confirm step he may fix only misread words: capital-only changes are refused (422) and one-word spelling-like fixes are flagged `suspect` in the stored diff (shown to the parent). A COPS edit pass (`EditPass.jsx`) comes before the photo. Personal error tracker: errors grouped by `category` over his latest 5 reviewed drafts, top recurring 3 on the reminder; the rewrite report checks each draft error (`check_fixed_errors`: fixed / still_there / rewritten). Parent panel: conventions trend, common errors, corrections list (`GET /wc/parent/conventions`).
-- **Frontend**: `frontend/src/writing-coach/`, screen `writingCoach`, opened from a small link on the grade 7 setup screen (`PracticePage`). An unfinished session resumes via localStorage `mathBuddy.wc.activeSession`.
-- **Remove later**: delete `app/writing_coach`, `src/writing-coach`, `tests/writing_coach`; `alembic downgrade 0001`; remove the 4 table classes in `models/tables.py`, the router include in `api/v1/__init__.py`, the `writingCoach` case in `App.jsx`/typedef, the link in `PracticePage`, and the panel in `AdminApp`.
-- **Calibration** (real model, costs cents): `WC_CALIBRATE=1 pytest tests/writing_coach/test_calibration.py -s`. 2026-11-02: Haiku-class Reviewer scored sample L2/L3/L4 answers 50/68/75, Sonnet-class 54/74/88, so use a Sonnet-class Reviewer.
+- **Marking** uses the teacher's rubric (`resources/Written Responses Rubric.pdf`, wording copied into `writing_coach/data/rubric.json`). The Reviewer scores Understanding, Evidence and Communication (level, percent, note, nextStep) and says `hasSpecificEvidence`. The app, not the model, works out `overall` in `Review`: the plain average of the three percents, mapped to a level. Rules from the parent's brief, not the PDF, are constants in `writing_coach/rubric.py`: no quote or specific evidence caps Evidence at 2- and overall at 2+ (`capApplied` only if that changed a mark), and the 5-7 sentence target. Sentence count and repeated openers (3+ sentences starting the same way) are counted by the app (`sentence_stats`), and model answers are checked in sentences (4-8 allowed). R/A/C/E/Extend colours are coaching only. Stored reviews from before the rubric have `scores`/`conventions` instead of `criteria`: they keep their overall level and old report layout, count in error tracking, and are left out of the criteria trends. The `rubric_override` column is unused (removal is covered by `alembic downgrade 0001`).
+- **Writing errors** (inside `criteria.communication`): up to 10 (original, correction, type, category, rule). Errors not found verbatim in the transcript, or on a word the Reader marked `[?]` (ambiguous capital), are dropped. The Reader copies spelling/capitals exactly; at the confirm step he may fix only misread words: capital-only changes are refused (422) and one-word spelling-like fixes are flagged `suspect` in the stored diff (shown to the parent). A COPS edit pass (`EditPass.jsx`) comes before the photo. Personal error tracker: errors grouped by `category` over his latest 5 reviewed drafts, top recurring 3 on the reminder; the rewrite report checks each draft error (`check_fixed_errors`: fixed / still_there / rewritten). Parent panel: draft marks per criterion for his latest 10 drafts with the lowest marked, common errors, corrections list (`GET /wc/parent/progress`).
+- **Deploy note for the rubric change**: deploy backend and frontend together. The previous frontend cannot display a review in the new format.
+- **Frontend**: `frontend/src/writing-coach/`, screen `writingCoach`, opened from a small link on the grade 7 setup screen (`PracticePage`). A practice is finished once its results are shown, whether or not he rewrites it: nothing has to be saved, and opening Writing Coach then shows the start page (results stay in My results). Only pending work resumes, via localStorage `mathBuddy.wc.activeSession` or the Continue list: no answer yet, an answer not yet marked, or a rewrite he chose to write (`mathBuddy.wc.rewriting`). The model answer is a section closed by default (`ModelAnswer.jsx`) on the report and in My results. The `next_time` and `model_move` columns are unused.
+- **Remove later**: delete `app/writing_coach` (its tables are in `app/writing_coach/models.py`), `src/writing-coach`, `tests/writing_coach`; `alembic downgrade 0001`; remove the router include in `app/main.py` and the `app.writing_coach.models` import in `alembic/env.py`, the `writingCoach` case in `App.jsx`/typedef, the link in `PracticePage`, and the panel in `AdminApp`.
+- **Calibration** (real model, costs cents): `WC_CALIBRATE=1 pytest tests/writing_coach/test_calibration.py -s`. 2026-11-02 (old marking): Haiku-class Reviewer scored sample L2/L3/L4 answers 50/68/75, Sonnet-class 54/74/88, so use a Sonnet-class Reviewer. 2026-11-03 (teacher's rubric, Sonnet-class, one run): samples 63/80/87, so the L3 sample landed on the edge of Level 4; model answers marked 84 (History) and 85 (Language).
 
 ---
 
@@ -68,7 +71,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (114 tests)
+npm run test:run        # Single run (176 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -89,23 +92,32 @@ docker-compose up --build
 
 ## Architecture
 
-### Backend (FastAPI + OpenRouter)
+### Backend (FastAPI + OpenRouter): feature layout
 
-**Key pattern**: All API logic flows through two endpoints, both using OpenRouter's Gemini 2.0 Flash:
+The backend is organised **by feature** (decided 2026-11-16). Each feature folder holds its own routes, logic, request/response shapes and tables, so a problem with one feature is fixed in one folder:
 
-1. **`POST /api/v1/questions/generate`** — Jinja2 prompt template in `backend/prompts/generate_questions.txt` creates a batch of questions + fun facts in one LLM call
-2. **`POST /api/v1/answers/evaluate`** — Vision-based evaluation: sketch data URIs extracted from canvas and sent as image content to the LLM so handwritten working is read directly
+```
+backend/app/
+  main.py            app setup, middleware, and one include_router line per feature
+  core/              shared plumbing
+    config.py          settings from env (pydantic-settings)
+    db.py              async engine/session, shared SQLAlchemy Base, JsonType, utcnow
+    deps.py            SessionDep, require_admin
+    llm.py             ALL LLM calls (call_llm, call_llm_with_usage, LLMServiceError)
+    logging_config.py
+  profiles/          GET /profiles/lookup, POST /profiles          (router, service, schemas, models: Profile)
+  curriculum/        GET /curriculum                               (router, service, schemas, data/curriculum.json)
+  practice/          POST /questions/generate, POST /answers/evaluate
+                     (router, question_service, evaluation_service, schemas, prompts/*.txt)
+  results/           POST /attempts, GET /profiles/{id}/lesson-status
+                     (router, service, schemas, models: LessonProgress, PracticeAttempt)
+  admin/             /admin/*  (router, schemas)
+  writing_coach/     /wc/*     (router, agents, schemas, models: Wc*, prompts/, data/)
+```
 
-**File organization**:
-- `app/main.py` — FastAPI app setup, CORS middleware, router mounting
-- `app/config.py` — pydantic-settings for environment variables (OPENROUTER_API_KEY, OPENROUTER_MODEL, CORS_ORIGINS)
-- `app/api/v1/` — endpoint handlers (questions.py, evaluate.py)
-- `app/services/` — business logic (question_service.py, evaluation_service.py)
-- `app/integrations/openrouter.py` — isolated LLM call function (`call_llm(prompt, images?)`)
-- `app/schemas/` — Pydantic request/response models
-- `backend/prompts/` — Jinja2 templates (never inline strings)
+Inside a feature: `router.py` handles HTTP only (URL, request shape, status codes); `service.py` does the work and raises plain Python errors; `schemas.py` holds Pydantic shapes; `models.py` holds tables. A new feature gets its own folder and one line in `main.py`. Alembic's `env.py` imports every `models.py` so migrations see all tables.
 
-**Important**: All LLM calls go through `backend/app/integrations/openrouter.py`. This is the single source of truth for model invocation.
+**Important**: All LLM calls go through `backend/app/core/llm.py` (LangChain `ChatOpenAI` pointed at OpenRouter). Prompt templates are Jinja2 `.txt` files in the feature's `prompts/` folder, never inline strings.
 
 ### Frontend (React 18 + Tailwind CSS 3)
 
@@ -213,12 +225,12 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 60 tests covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already — they patch `openrouter.call_llm` but the service imports from `langchainrouter`. DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 175 tests (170 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 114 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
+- 176 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)
@@ -250,8 +262,9 @@ All 25 tasks in `specs/002-eduspark-dark-theme/tasks.md` are complete:
 
 | File | Purpose |
 |---|---|
-| `backend/app/integrations/openrouter.py` | All LLM calls (single source of truth) |
-| `backend/prompts/*.txt` | Jinja2 prompt templates (never inline) |
+| `backend/app/main.py` | App setup + one router per feature |
+| `backend/app/core/llm.py` | All LLM calls (single source of truth) |
+| `backend/app/<feature>/prompts/*.txt` | Jinja2 prompt templates (never inline) |
 | `frontend/src/context/SessionContext.jsx` | Entire session state + actions |
 | `frontend/src/lib/api.js` | API client (no fetch in components) |
 | `frontend/src/index.css` | CSS tokens + EduSpark utilities |
@@ -266,11 +279,11 @@ All 25 tasks in `specs/002-eduspark-dark-theme/tasks.md` are complete:
 ## Common Patterns
 
 ### Adding a new API endpoint
-1. Add Pydantic models in `backend/app/schemas/`
-2. Create handler in `backend/app/api/v1/`
-3. Call `call_llm()` from `backend/app/integrations/openrouter.py` if LLM-dependent
-4. Add Jinja2 template in `backend/prompts/` if needed
-5. Add React hook + `api.js` client in frontend
+1. Pick the feature folder it belongs to (`backend/app/<feature>/`), or create a new one and add one `include_router` line in `main.py`
+2. Add Pydantic shapes in `<feature>/schemas.py`, tables in `<feature>/models.py` (and import that file in `alembic/env.py` if new)
+3. Put the logic in `<feature>/service.py`; keep `<feature>/router.py` to HTTP in/out only
+4. Call `call_llm()` from `backend/app/core/llm.py` if LLM-dependent, with a Jinja2 template in `<feature>/prompts/`
+5. Add the client call in `frontend/src/lib/api.js`
 6. Call from `SessionContext` action, not directly from components
 
 ### Adding a new React screen

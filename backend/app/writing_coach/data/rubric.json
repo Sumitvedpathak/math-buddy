@@ -1,0 +1,41 @@
+{
+  "source": "resources/Written Responses Rubric.pdf (Language Arts - Written Responses: Demonstrating Comprehension). Wording copied exactly.",
+  "bands": {
+    "1": "Beginning (51-59%)",
+    "2": "Developing (60-69%)",
+    "3": "Meeting Expectations (70-79%)",
+    "4": "Exceeding Expectations (80-100%)"
+  },
+  "criteria": [
+    {
+      "key": "understanding",
+      "name": "Understanding & Comprehension",
+      "levels": {
+        "1": "Demonstrates limited understanding of the text. Responses may be inaccurate or incomplete.",
+        "2": "Demonstrates some understanding of the text. Responses show partial comprehension.",
+        "3": "Demonstrates a clear understanding of the text. Responses accurately address the question.",
+        "4": "Demonstrates thorough understanding of the text. Responses show thoughtful insight and deeper connections."
+      }
+    },
+    {
+      "key": "evidence",
+      "name": "Supporting Ideas with Evidence",
+      "levels": {
+        "1": "Provides little or no evidence from the text to support answers or opinions",
+        "2": "Provides limited or general evidence from the text. Connections between evidence and answers may be unclear.",
+        "3": "Uses relevant evidence or examples from the text to support answers, ideas, and opinions.",
+        "4": "Uses specific and meaningful evidence from the text and clearly explains how it supports their thinking."
+      }
+    },
+    {
+      "key": "communication",
+      "name": "Written Communication",
+      "levels": {
+        "1": "Responses are incomplete or difficult to understand. Frequently uses fragments rather than full sentences.",
+        "2": "Attempts to use full sentences, but errors in grammar and sentence structure sometimes affect clarity.",
+        "3": "Communicates ideas using complete sentences, proper grammar, and appropriate sentence structure.",
+        "4": "Communicates ideas clearly and effectively using varied sentence structures and consistently strong grammar."
+      }
+    }
+  ]
+}

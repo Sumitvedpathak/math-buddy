@@ -15,11 +15,13 @@ from typing import TypeVar
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, ValidationError
 
-from app.config import get_settings
-from app.integrations.langchainrouter import LLMServiceError, call_llm_with_usage
+from app.core.config import get_settings
+from app.core.llm import LLMServiceError, call_llm_with_usage
+from app.writing_coach.rubric import RUBRIC
 from app.writing_coach.schemas import (
     COMMAND_WORDS,
     GeneratedItem,
+    ModelAnswer,
     ReaderResult,
     Review,
 )
@@ -34,6 +36,7 @@ _jinja = Environment(loader=FileSystemLoader(str(BASE_DIR / "prompts")))
 GENERATOR_TEMPERATURE = 0.7
 READER_TEMPERATURE = 0.0
 REVIEWER_TEMPERATURE = 0.1
+MODEL_ANSWER_TEMPERATURE = 0.3
 
 
 class AgentOutputError(LLMServiceError):
@@ -126,6 +129,11 @@ def history_topics(strand: str) -> list[dict]:
         bank = _load_json(f"history_strand_{s.lower()}.json")
         topics.extend({**t, "strand": s} for t in bank["topics"])
     return topics
+
+
+def history_topic(topic_id: str) -> dict | None:
+    """The stored facts for a topic, or None if the bank no longer has it."""
+    return next((t for t in history_topics("both") if t["id"] == topic_id), None)
 
 
 def language_types() -> list[dict]:
@@ -249,7 +257,6 @@ async def review_answer(
     kind: str,
     item: dict,
     focus: str,
-    rubric_override: str | None,
     transcript: str,
 ) -> tuple[Review, str]:
     """Grade the CONFIRMED transcript. Returns (review, model used)."""
@@ -264,14 +271,35 @@ async def review_answer(
             "parts": item["parts"],
             "key_terms": item["key_terms"],
             "focus": focus,
-            "rubric_override": (rubric_override or "").strip() or None,
+            "rubric": RUBRIC,
+            "background": item.get("background", ""),
             "transcript": transcript,
         },
         Review,
         model=reviewer_model(),
         temperature=REVIEWER_TEMPERATURE,
     )
-    review.drop_unmatched_tags(transcript)
-    review.drop_unmatched_conventions(transcript)
-    review.apply_conventions()
+    review.check_against_transcript(transcript)
     return review, reviewer_model()
+
+
+async def write_model_answer(*, subject: str, item: dict, topic: dict | None) -> str:
+    """Level 4 model answer, written by the Reviewer's model against the same rubric that marks it."""
+    result = await run_agent(
+        "model_answer",
+        "model_answer.txt",
+        {
+            "subject": subject,
+            "question": item["question"],
+            "command_words": item["command_words"],
+            "parts": item["parts"],
+            "key_terms": item["key_terms"],
+            "background": item.get("background", ""),
+            "topic": topic,
+            "rubric": RUBRIC,
+        },
+        ModelAnswer,
+        model=reviewer_model(),
+        temperature=MODEL_ANSWER_TEMPERATURE,
+    )
+    return result.model_answer

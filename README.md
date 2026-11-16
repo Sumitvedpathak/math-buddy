@@ -23,8 +23,8 @@ An AI-powered math practice web app for children aged 9–12. Students pick topi
 |---|---|
 | Backend language | Python 3.11 |
 | Backend framework | FastAPI 0.110+ / Pydantic v2 |
-| LLM integration | OpenRouter → `google/gemini-2.0-flash-001` via `openai` SDK |
-| Prompt templates | Jinja2 `.txt` files in `backend/prompts/` |
+| LLM integration | OpenRouter → `google/gemini-2.0-flash-001` via LangChain `ChatOpenAI` |
+| Prompt templates | Jinja2 `.txt` files in each feature's `prompts/` folder |
 | Frontend framework | React 18 + Vite 5 (JSX, not TSX) |
 | Styling | Tailwind CSS 3 + CSS custom properties |
 | Sketch canvas | react-sketch-canvas 6.2.0 |
@@ -41,24 +41,21 @@ An AI-powered math practice web app for children aged 9–12. Students pick topi
 ```
 math-buddy/
 ├── backend/
-│   ├── app/
-│   │   ├── main.py                      # FastAPI app, CORS middleware, router mount
-│   │   ├── config.py                    # pydantic-settings: OPENROUTER_API_KEY, OPENROUTER_MODEL
-│   │   ├── api/v1/
-│   │   │   ├── questions.py             # POST /api/v1/questions/generate
-│   │   │   └── evaluate.py              # POST /api/v1/answers/evaluate
-│   │   ├── services/
-│   │   │   ├── question_service.py      # question generation + fun facts logic
-│   │   │   └── evaluation_service.py    # answer evaluation; extracts sketch images for vision
-│   │   ├── integrations/
-│   │   │   └── openrouter.py            # call_llm(prompt, images?) — all LLM calls isolated here
-│   │   └── schemas/
-│   │       ├── questions.py             # GenerateQuestionsRequest / Response
-│   │       └── evaluation.py            # EvaluateAnswersRequest / Response
-│   ├── prompts/
-│   │   ├── generate_questions.txt       # Jinja2: question generation
-│   │   ├── evaluate_answers.txt         # Jinja2: evaluation (references attached sketch images)
-│   │   └── fun_facts.txt               # Jinja2: fun facts generation
+│   ├── app/                             # organised by feature
+│   │   ├── main.py                      # FastAPI app, middleware, one router per feature
+│   │   ├── core/                        # shared: config, db, deps, logging, llm.py (all LLM calls)
+│   │   ├── profiles/                    # GET /profiles/lookup, POST /profiles
+│   │   ├── curriculum/                  # GET /curriculum (+ data/curriculum.json)
+│   │   ├── practice/                    # POST /questions/generate, POST /answers/evaluate
+│   │   │   ├── router.py                #   HTTP in/out only
+│   │   │   ├── question_service.py      #   question generation + fun facts
+│   │   │   ├── evaluation_service.py    #   marking; sends sketch images for vision
+│   │   │   ├── schemas.py               #   request/response shapes
+│   │   │   └── prompts/                 #   Jinja2 templates
+│   │   ├── results/                     # POST /attempts, GET /profiles/{id}/lesson-status
+│   │   ├── admin/                       # /admin/* (admin token)
+│   │   └── writing_coach/               # /wc/* (temporary feature, self-contained)
+│   ├── alembic/                         # database migrations
 │   ├── tests/
 │   │   ├── unit/
 │   │   ├── integration/
@@ -78,8 +75,7 @@ math-buddy/
 │   │   │   ├── QuestionCard.jsx         # question text + sketch/text toggle
 │   │   │   ├── SketchCanvas.jsx         # wraps react-sketch-canvas
 │   │   │   ├── LoadingScreen.jsx        # animated progress bar + rotating fun facts
-│   │   │   ├── ErrorBanner.jsx          # themed error message + retry action
-│   │   │   └── ScoreCard.jsx            # per-question result with marks and feedback
+│   │   │   └── ErrorBanner.jsx          # themed error message + retry action
 │   │   ├── context/
 │   │   │   └── SessionContext.jsx       # all session state (flat shape: { state, ...actions })
 │   │   ├── lib/
@@ -207,11 +203,11 @@ npm test
 
 ## Architecture Notes
 
-- **LLM calls are isolated** — all calls go through `backend/app/integrations/openrouter.py`. The `call_llm(prompt, images?)` function builds plain text or multimodal (vision) messages depending on whether sketch images are provided.
+- **LLM calls are isolated** — all calls go through `backend/app/core/llm.py`. The `call_llm(prompt, images?)` function builds plain text or multimodal (vision) messages depending on whether sketch images are provided.
 - **Vision evaluation** — sketch data URIs are extracted in `evaluation_service.py` and passed as `image_url` content to the LLM so handwritten working is read directly, not described as text.
 - **No raw `fetch()` in components** — all API access goes through `frontend/src/lib/api.js`.
 - **Fun facts seed immediately** — 15 fallback facts from `fallbackFacts.js` are shown the moment the loading screen appears; LLM-generated facts replace them when the API responds.
-- **Prompt templates** — stored as Jinja2 `.txt` files in `backend/prompts/`, never inline strings.
+- **Prompt templates** — stored as Jinja2 `.txt` files in the feature's `prompts/` folder (e.g. `backend/app/practice/prompts/`), never inline strings.
 
 ---
 

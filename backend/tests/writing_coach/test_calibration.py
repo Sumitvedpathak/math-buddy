@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from app.writing_coach.agents import review_answer
+from app.writing_coach.agents import history_topics, review_answer, write_model_answer
 
 pytestmark = pytest.mark.skipif(
     os.getenv("WC_CALIBRATE") != "1", reason="calls the real model; set WC_CALIBRATE=1"
@@ -59,12 +59,52 @@ async def test_reviewer_ranks_level_2_3_4_in_order():
     for text in (LEVEL_2, LEVEL_3, LEVEL_4):
         review, _ = await review_answer(
             subject="history", kind="draft", item=ITEM, focus="Cite and Explain",
-            rubric_override=None, transcript=text,
+            transcript=text,
         )
-        percents.append(review.percent)
+        percents.append(review.overall.percent)
     print("Level 2 / 3 / 4 sample percents:", percents)
     # Order and spread matter; exact scores vary by model. Observed 2026-11-02:
     #   Haiku-class Reviewer 50 / 68 / 75, Sonnet-class Reviewer 54 / 74 / 88.
     assert percents[0] < percents[1] < percents[2]
     assert percents[0] < 70
     assert percents[2] - percents[0] >= 15
+
+
+# SAMPLE (labelled): a short practice text written for this test.
+PASSAGE = (
+    "Nadia watched the river climb the fence for the third spring in a row. The sign about the new wall had "
+    "peeled until only the word SOON was left. Her father said the council had promised it years ago. "
+    "He handed her a shovel without another word, and they began to fill sandbags beside the neighbours."
+)
+LANGUAGE_ITEM = {
+    "question": "Evaluate how the author shows the cost of waiting for help in this passage.",
+    "command_words": ["Evaluate"],
+    "parts": 1,
+    "key_terms": ["theme", "symbol", "inference", "conflict"],
+    "background": PASSAGE,
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("subject", ["history", "language"])
+async def test_a_model_answer_earns_level_4_when_marked(subject):
+    topic = history_topics("A")[0] if subject == "history" else None
+    if topic:
+        item = {
+            **ITEM,
+            "question": f"Explain why this mattered: {topic['title']}.",
+            "key_terms": topic["key_terms"][:4],
+            "background": "",
+        }
+    else:
+        item = LANGUAGE_ITEM
+    answer = await write_model_answer(subject=subject, item=item, topic=topic)
+    review, _ = await review_answer(
+        subject=subject, kind="rewrite", item=item, focus="Cite and Explain", transcript=answer,
+    )
+    c = review.criteria
+    print(subject, "model answer:", answer)
+    print(subject, "overall:", review.overall.model_dump())
+    print(subject, "criteria:", c.understanding.percent, c.evidence.percent, c.communication.percent)
+    print(subject, "errors:", [e.original for e in c.communication.errors])
+    assert review.overall.percent >= 80

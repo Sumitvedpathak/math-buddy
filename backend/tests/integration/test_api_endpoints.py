@@ -28,7 +28,7 @@ GOOD_LLM_RESPONSE = {
 async def test_generate_questions_success():
     """Full pipeline returns 200 with correct structure when LLM responds correctly."""
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(return_value=GOOD_LLM_RESPONSE),
     ):
         resp = client.post(
@@ -47,9 +47,9 @@ async def test_generate_questions_success():
 @pytest.mark.asyncio
 async def test_generate_questions_llm_error_returns_503():
     """Service layer failure returns HTTP 503."""
-    from app.integrations.openrouter import LLMServiceError
+    from app.core.llm import LLMServiceError
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(side_effect=LLMServiceError("connection error")),
     ):
         resp = client.post(

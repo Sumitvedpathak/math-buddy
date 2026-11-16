@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { wc } from './wcApi'
 import Report from './Report'
-import { STEP_BY_KEY, SUBJECT_LABEL } from './colours'
+import ModelAnswer from './ModelAnswer'
+import { CRITERIA_LABELS, SUBJECT_LABEL } from './colours'
 import { btn, btnGhost } from './Start'
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -12,39 +13,36 @@ function Overview({ overview }) {
   if (!overview || overview.session_count === 0) {
     return <p className="text-ink-soft">Finish your first practice and your progress will show up here.</p>
   }
-  const { steps, recent_count: recent } = overview
+  const { criteria, recent_count: recent } = overview
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="font-semibold text-ink">Where you are lagging (your last {recent} {recent === 1 ? 'session' : 'sessions'})</h3>
-        <ul className="mt-3 space-y-2 list-none p-0">
-          {steps.map((s) => (
-            <li key={s.step}>
-              <div className="flex justify-between text-sm">
-                <span className="text-ink">{STEP_BY_KEY[s.step].label}</span>
-                <span className="font-mono text-ink-soft">
-                  {s.average} / 2{s.missing_count > 0 && ` · missing in ${s.missing_count}`}
-                </span>
-              </div>
-              <div className="mt-1 h-2 rounded-full bg-muted">
-                <div className="h-2 rounded-full" style={{ width: `${(s.average / 2) * 100}%`, background: STEP_BY_KEY[s.step].border }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-sm text-ink-soft">
-          Weakest first. <strong className="text-ink">{STEP_BY_KEY[steps[0].step].label}</strong> needs the most work.
-        </p>
-      </div>
+      {criteria.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-ink">Where you are lagging (your last {recent} {recent === 1 ? 'session' : 'sessions'})</h3>
+          <ul className="mt-3 space-y-2 list-none p-0">
+            {criteria.map((c) => (
+              <li key={c.key}>
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink">{CRITERIA_LABELS[c.key]}</span>
+                  <span className="font-mono text-ink-soft">{c.average}%</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${c.average}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-ink-soft">
+            Weakest first. <strong className="text-ink">{CRITERIA_LABELS[criteria[0].key]}</strong> needs the most work.
+          </p>
+        </div>
+      )}
       {overview.top_errors?.length > 0 && (
         <div>
           <h3 className="font-semibold text-ink">Your most common writing mistakes</h3>
           <ul className="mt-2 list-disc pl-5 text-ink-soft">
             {overview.top_errors.map((e) => <li key={e.category}>{e.label}: {e.count} {e.count === 1 ? 'time' : 'times'}</li>)}
           </ul>
-          {overview.conventions_average != null && (
-            <p className="mt-2 text-sm text-ink-soft">Your average conventions score is {overview.conventions_average} out of 2.</p>
-          )}
         </div>
       )}
       <ul className="list-disc pl-5 text-ink-soft space-y-1">
@@ -54,8 +52,8 @@ function Overview({ overview }) {
         {overview.command_words_missed.length > 0 && (
           <li>Command words you decoded wrongly: {overview.command_words_missed.map(([w, n]) => `${w} (${n})`).join(', ')}.</li>
         )}
-        {overview.average_word_count != null && (
-          <li>Your drafts average {overview.average_word_count} words. The target is 150 to 250.</li>
+        {overview.average_sentence_count != null && (
+          <li>Your drafts average {overview.average_sentence_count} sentences. The target is 5 to 7.</li>
         )}
       </ul>
       <div>
@@ -84,7 +82,7 @@ function Overview({ overview }) {
   )
 }
 
-function SessionDetail({ profileId, row, onBack }) {
+function SessionDetail({ profileId, row, onBack, onRewrite }) {
   const [report, setReport] = useState(null)
   const [kind, setKind] = useState('draft')
   const [error, setError] = useState(null)
@@ -103,7 +101,6 @@ function SessionDetail({ profileId, row, onBack }) {
       <section className="rounded-2xl bg-card ring-soft p-6">
         <p className="font-mono text-xs uppercase text-muted-foreground">{SUBJECT_LABEL[session.subject]} · {fmt(session.created_at)}</p>
         <p className="mt-2 font-display text-xl text-ink">{session.item.question}</p>
-        {session.next_time && <p className="mt-3 text-ink-soft">Your goal: “{session.next_time}”</p>}
       </section>
       {hasRewrite && (
         <div role="tablist" className="flex gap-2">
@@ -116,18 +113,15 @@ function SessionDetail({ profileId, row, onBack }) {
         </div>
       )}
       <Report report={report} kind={hasRewrite ? kind : 'draft'} />
-      {session.item.model_answer && (
-        <section className="rounded-2xl bg-card ring-soft p-6">
-          <h2 className="font-display text-xl font-semibold text-ink">Level 4 model answer</h2>
-          <p className="mt-3 whitespace-pre-wrap text-ink-soft">{session.item.model_answer}</p>
-          {session.model_move && <p className="mt-3 text-ink">A move you noticed: {session.model_move}</p>}
-        </section>
+      <ModelAnswer profileId={profileId} session={session} />
+      {!report.submissions.rewrite && (
+        <button type="button" className={btn} onClick={() => onRewrite(report)}>Rewrite it one level higher</button>
       )}
     </div>
   )
 }
 
-export default function History({ profileId, onBack, onNew }) {
+export default function History({ profileId, onBack, onNew, onRewrite }) {
   const [rows, setRows] = useState(null)
   const [overview, setOverview] = useState(null)
   const [error, setError] = useState(null)
@@ -155,7 +149,7 @@ export default function History({ profileId, onBack, onNew }) {
       {error && <p role="alert" className="text-destructive">{error}</p>}
       {!rows && !error && <p className="text-ink-soft">Loading…</p>}
 
-      {rows && open && <SessionDetail profileId={profileId} row={open} onBack={() => setOpen(null)} />}
+      {rows && open && <SessionDetail profileId={profileId} row={open} onBack={() => setOpen(null)} onRewrite={onRewrite} />}
 
       {rows && !open && (
         <>

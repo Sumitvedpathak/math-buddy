@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { wcParent } from './wcApi'
-import { SUBJECT_LABEL } from './colours'
+import { CRITERIA_LABELS, SUBJECT_LABEL } from './colours'
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 const levelText = (r) => (r ? `${r.level} (${r.percent}%)` : '—')
+const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
 function Settings({ token, profileId }) {
   const [form, setForm] = useState(null)
@@ -49,14 +50,6 @@ function Settings({ token, profileId }) {
           </select>
         </label>
       </div>
-      <div>
-        <label htmlFor="wc-rubric" className="block text-sm text-ink-soft">
-          Teacher&apos;s rubric or success criteria (used on his reminder screen and by the marker)
-        </label>
-        <textarea id="wc-rubric" rows={5} maxLength={6000} value={form.rubric_override || ''}
-          onChange={(e) => set({ rubric_override: e.target.value })}
-          className="mt-2 w-full rounded-md border border-border bg-background p-3 text-ink" />
-      </div>
       {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="flex items-center gap-3">
         <button type="submit" className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">Save settings</button>
@@ -66,29 +59,58 @@ function Settings({ token, profileId }) {
   )
 }
 
-function ConventionsSummary({ data }) {
-  if (!data || data.trend.length === 0) return null
+/** Draft marks per criterion over time, so a parent can see which one is holding him back. */
+function CriteriaTrend({ data }) {
+  if (!data || (data.trend.length === 0 && data.top_errors.length === 0)) return null
+  const { trend, averages, lowest, top_errors: topErrors } = data
+  const cell = 'py-2 pr-4 whitespace-nowrap'
   return (
-    <div className="mt-6 space-y-4" aria-label="Conventions">
-      <h3 className="font-display text-lg font-semibold text-ink">Spelling, grammar and punctuation</h3>
-      <div>
-        <p className="text-sm text-muted-foreground">Conventions score per practice (out of 2), oldest first</p>
-        <ul className="mt-2 flex flex-wrap gap-3 list-none p-0">
-          {data.trend.map((t) => (
-            <li key={t.date} className="rounded-md bg-muted px-3 py-2 text-sm text-ink-soft">
-              <span className="block font-mono text-xs text-muted-foreground">{dateFmt.format(new Date(t.date))}</span>
-              Draft <strong className="text-ink">{t.draft_score ?? '—'}</strong>
-              {t.rewrite_score != null && <> · Rewrite <strong className="text-ink">{t.rewrite_score}</strong></>}
-              {t.errors_flagged > 0 && <span className="block">Fixed {t.errors_fixed} of {t.errors_flagged} draft mistakes</span>}
-            </li>
-          ))}
-        </ul>
-      </div>
-      {data.top_errors.length > 0 && (
+    <div className="mt-6 space-y-4">
+      {trend.length > 0 && (
+        <div>
+          <h3 className="font-display text-lg font-semibold text-ink">The three criteria over time</h3>
+          <p className="text-sm text-muted-foreground">Draft marks only, for his latest {trend.length} {trend.length === 1 ? 'draft' : 'drafts'}, oldest first</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-left text-sm" aria-label="Marks for each criterion">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Criterion</th>
+                  {trend.map((t, i) => <th key={i} className={`${cell} font-medium`}>{shortDate.format(new Date(t.date))}</th>)}
+                  <th className="py-2 font-medium">Average</th>
+                </tr>
+              </thead>
+              <tbody className="text-ink-soft">
+                {Object.entries(CRITERIA_LABELS).map(([key, label]) => (
+                  <tr key={key} className="border-t border-border">
+                    <th scope="row" className={`${cell} font-medium text-ink`}>{label}</th>
+                    {trend.map((t, i) => <td key={i} className={cell}>{t[key].level}</td>)}
+                    <td className={`py-2 whitespace-nowrap ${key === lowest ? 'font-semibold text-primary' : ''}`}>
+                      {averages[key]}%{key === lowest && ' lowest'}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t border-border">
+                  <th scope="row" className={`${cell} font-medium text-ink`}>Overall</th>
+                  {trend.map((t, i) => <td key={i} className={cell}>{t.overall.level}{t.cap_applied && ' capped'}</td>)}
+                  <td className="py-2">{averages.overall}%</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <th scope="row" className={`${cell} font-medium text-ink`}>Draft mistakes fixed</th>
+                  {trend.map((t, i) => (
+                    <td key={i} className={cell}>{t.errors_flagged > 0 ? `${t.errors_fixed} of ${t.errors_flagged}` : '—'}</td>
+                  ))}
+                  <td className="py-2" />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {topErrors.length > 0 && (
         <div>
           <p className="text-sm text-muted-foreground">Most common mistakes</p>
           <ul className="mt-2 list-disc pl-5 text-ink-soft">
-            {data.top_errors.map((e) => <li key={e.category}>{e.label}: {e.count}</li>)}
+            {topErrors.map((e) => <li key={e.category}>{e.label}: {e.count}</li>)}
           </ul>
         </div>
       )}
@@ -115,15 +137,15 @@ function Corrections({ corrections }) {
   )
 }
 
-/** Parent view: tests done, levels, conventions trend and common mistakes, and any text he changed. */
+/** Parent view: tests done, levels, the three-criteria trend and common mistakes, and any text he changed. */
 export default function WritingCoachPanel({ token, profileId }) {
   const [rows, setRows] = useState(null)
-  const [conventions, setConventions] = useState(null)
+  const [progress, setProgress] = useState(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     wcParent.sessions(token, profileId).then(setRows).catch(() => setError(true))
-    wcParent.conventions(token, profileId).then(setConventions).catch(() => setConventions(null))
+    wcParent.progress(token, profileId).then(setProgress).catch(() => setProgress(null))
   }, [token, profileId])
 
   return (
@@ -163,7 +185,7 @@ export default function WritingCoachPanel({ token, profileId }) {
           </div>
         )}
       </div>
-      <ConventionsSummary data={conventions} />
+      <CriteriaTrend data={progress} />
       <Settings token={token} profileId={profileId} />
     </section>
   )

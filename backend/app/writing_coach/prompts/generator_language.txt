@@ -21,7 +21,6 @@ Write:
 5. "background": the original practice text described above (for a novel question, put the passage here).
 6. "key_terms": 4 to 6 subject words useful for this answer (for example theme, symbol, conflict, imagery, mood, perspective).
 7. "extend_hints": 2 to 3 short hints for a deeper Level 4 idea (another perspective, the author's choice and why, a link to today).
-8. "model_answer": a Level 4 model answer of 150 to 250 words about the practice text. It restates the question, answers every part, cites at least two quotes or details from the practice text, explains how each proves the point, and extends with a deeper idea. Use at least two key terms.
-9. "text_kind": "{{ qtype.kind }}".
+8. "text_kind": "{{ qtype.kind }}".
 
-Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, model_answer, text_kind.
+Return ONLY a JSON object with exactly these keys: question, command_words, parts, thinking_focus, background, key_terms, extend_hints, text_kind.

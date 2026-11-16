@@ -3,13 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { SessionProvider } from './context/SessionContext'
 import App from './app/App'
 import AdminApp, { adminTokenFromPath } from './app/admin/AdminApp'
-import { theme, setTheme } from './themes/dandysWorld'
 import './index.css'
 
-// Apply default theme before first render
 const rootEl = document.getElementById('root')
-rootEl.id = 'root'
-// The theme-root wrapper is inside App — we apply after mount via useEffect in App
 
 // /admin/<token> is a separate route tree: no session, no links to it from the child app.
 const adminToken = adminTokenFromPath(window.location.pathname)
@@ -25,6 +21,3 @@ ReactDOM.createRoot(rootEl).render(
     )}
   </React.StrictMode>
 )
-
-// Export for use in App after mount
-export { theme, setTheme }

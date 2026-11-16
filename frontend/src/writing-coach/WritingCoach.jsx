@@ -8,13 +8,16 @@ import UploadStep from './UploadStep'
 import EditPass from './EditPass'
 import ConfirmStep from './ConfirmStep'
 import Report from './Report'
-import WrapUp from './WrapUp'
+import ModelAnswer from './ModelAnswer'
 import History from './History'
 
 const ACTIVE_KEY = 'mathBuddy.wc.activeSession'
+const REWRITING_KEY = 'mathBuddy.wc.rewriting'
 
+/** The practice to reopen next time, or null when nothing is pending. */
 function rememberActive(id) {
   try {
+    window.localStorage.removeItem(REWRITING_KEY)
     if (id) window.localStorage.setItem(ACTIVE_KEY, id)
     else window.localStorage.removeItem(ACTIVE_KEY)
   } catch {
@@ -30,22 +33,40 @@ function recallActive() {
   }
 }
 
-/** Where an unfinished session should pick up, from what is already saved. */
-export function stepFromReport(report) {
+/** He chose to rewrite a marked practice. The server only knows once he sends a photo. */
+function rememberRewriting(id) {
+  rememberActive(id)
+  try {
+    window.localStorage.setItem(REWRITING_KEY, id)
+  } catch {
+    // storage unavailable: a refresh just goes back to the start page
+  }
+}
+
+function recallRewriting() {
+  try {
+    return window.localStorage.getItem(REWRITING_KEY)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Where a pending practice should pick up, or null if it is finished.
+ * A practice is finished once its results are shown, whether or not he rewrites it.
+ */
+export function stepFromReport(report, { rewriting = false } = {}) {
   const { session, submissions } = report
   const { draft, rewrite } = submissions
   if (session.status === 'done') return null
   // An unmarked answer goes back to the check step: marking costs money and can fail,
   // so it only ever runs when he presses the button.
   if (rewrite) {
-    return rewrite.review
-      ? { step: 'report', kind: 'rewrite' }
-      : { step: 'confirm', kind: 'rewrite', submission: rewrite }
+    return rewrite.review ? null : { step: 'confirm', kind: 'rewrite', submission: rewrite }
   }
   if (draft) {
-    return draft.review
-      ? { step: 'report', kind: 'draft' }
-      : { step: 'confirm', kind: 'draft', submission: draft }
+    if (draft.review) return rewriting ? { step: 'write', kind: 'rewrite' } : null
+    return { step: 'confirm', kind: 'draft', submission: draft }
   }
   return { step: session.decode ? 'write' : 'question', kind: 'draft' }
 }
@@ -76,7 +97,6 @@ export default function WritingCoach() {
   const [report, setReport] = useState(null)
   const [submission, setSubmission] = useState(null) // { id, transcript }
   const [images, setImages] = useState(null) // browser only; never stored
-  const [model, setModel] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -107,6 +127,7 @@ export default function WritingCoach() {
     async (submissionId, sessionId, nextKind) => {
       await wc.review(profileId, submissionId)
       await refreshReport(sessionId)
+      rememberActive(null) // results shown: next time he starts fresh
       setKind(nextKind)
       setStep('report')
     },
@@ -117,26 +138,27 @@ export default function WritingCoach() {
   const openSession = useCallback(
     async (sessionId) => {
       const r = await wc.report(profileId, sessionId)
-      const resume = stepFromReport(r)
+      const rewriting = recallRewriting() === sessionId
+      const resume = stepFromReport(r, { rewriting })
       if (!resume) return false
       setReport(r)
       setSession(r.session)
       setKind(resume.kind)
       setImages(null)
-      setModel(null)
       setSubmission(
         resume.submission
           ? { id: resume.submission.id, transcript: resume.submission.confirmed || resume.submission.original }
           : null
       )
-      rememberActive(sessionId)
+      if (rewriting) rememberRewriting(sessionId)
+      else rememberActive(sessionId)
       setStep(resume.step)
       return true
     },
     [profileId]
   )
 
-  /** Back to the start page, with a fresh list of unfinished practice and his latest goal. */
+  /** Back to the start page, with a fresh list of unfinished practice. */
   const goToStart = useCallback(() => {
     setError(null)
     setStep('start')
@@ -195,8 +217,17 @@ export default function WritingCoach() {
     setReport(null)
     setKind('draft')
     setImages(null)
-    setModel(null)
     setStep('question')
+  }
+
+  /** He chose to rewrite a marked practice, from its results or from My results. */
+  function startRewrite(r) {
+    rememberRewriting(r.session.id)
+    setReport(r)
+    setSession(r.session)
+    setKind('rewrite')
+    setImages(null)
+    setStep('write')
   }
 
   async function readPhotos(imgs) {
@@ -217,25 +248,8 @@ export default function WritingCoach() {
     setStep((s) => (s === 'reviewing' ? 'confirm' : s))
   }
 
-  async function openModel() {
-    const m = await run(() => wc.modelAnswer(profileId, session.id))
-    if (!m) return
-    setModel(m)
-    setStep('wrapup')
-  }
-
-  async function finish(body) {
-    const done = await run(() => wc.finish(profileId, session.id, body))
-    if (!done) return
-    rememberActive(null)
-    await run(async () => {
-      await refreshReport(session.id)
-      setReminder(await wc.reminder(profileId)) // so the next reminder shows the goal he just set
-    })
-    setStep('done')
-  }
-
   const feedback = report?.submissions.draft?.review
+  const canRewrite = kind === 'draft' && !report?.submissions.rewrite?.review
 
   switch (step) {
     case 'loading':
@@ -258,7 +272,7 @@ export default function WritingCoach() {
       )
     case 'history':
       return (
-        <History profileId={profileId} onBack={goToStart} onNew={goToStart} />
+        <History profileId={profileId} onBack={goToStart} onNew={goToStart} onRewrite={startRewrite} />
       )
     case 'question':
       return (
@@ -283,7 +297,7 @@ export default function WritingCoach() {
           <BackBar
             label={kind === 'rewrite' ? 'Back to my draft report' : 'Back'}
             onBack={() => {
-              if (kind === 'rewrite') { setKind('draft'); setStep('report') } else setStep('question')
+              if (kind === 'rewrite') { rememberActive(null); setKind('draft'); setStep('report') } else setStep('question')
             }}
           />
           <WriteStep
@@ -345,51 +359,23 @@ export default function WritingCoach() {
           </header>
           <Report report={report} kind={kind} />
           {errorBanner}
+          <ModelAnswer key={report.session.id} profileId={profileId} session={report.session} />
           <div className="flex flex-wrap gap-3">
-            {kind === 'draft' && (
-              <button type="button" className={btn} onClick={() => { setKind('rewrite'); setImages(null); setStep('write') }}>
+            {canRewrite && (
+              <button
+                type="button"
+                className={btn}
+                onClick={() => startRewrite(report)}
+              >
                 Rewrite it one level higher
               </button>
             )}
-            <button type="button" className={kind === 'draft' ? btnGhost : btn} disabled={busy} onClick={openModel}>
-              See the model answer
-            </button>
+            <button type="button" className={canRewrite ? btnGhost : btn} onClick={goToStart}>New practice</button>
+            <button type="button" className={btnGhost} onClick={() => setStep('history')}>My results</button>
           </div>
         </div>
         </>
       )
-    case 'wrapup':
-      return (
-        <>
-          <BackBar
-            label="Back to my report"
-            onBack={() => {
-              setError(null)
-              setKind(report?.submissions.rewrite?.review ? 'rewrite' : 'draft')
-              setStep('report')
-            }}
-          />
-          <WrapUp model={model} busy={busy} error={error} onFinish={finish} />
-        </>
-      )
-    case 'done': {
-      const d = report?.submissions.draft?.review
-      const r = report?.submissions.rewrite?.review
-      return (
-        <div className="mx-auto max-w-xl px-6 py-16 text-center space-y-6">
-          <h1 className="font-display text-4xl font-semibold text-ink">Practice saved</h1>
-          {d && (
-            <p className="text-ink-soft">
-              Draft: Level {d.level} ({d.percent}%){r && ` · Rewrite: Level ${r.level} (${r.percent}%)`}
-            </p>
-          )}
-          <div className="flex justify-center gap-3">
-            <button type="button" className={btn} onClick={() => setStep('history')}>See my results</button>
-            <button type="button" className={btnGhost} onClick={goToStart}>Done</button>
-          </div>
-        </div>
-      )
-    }
     default:
       return null
   }

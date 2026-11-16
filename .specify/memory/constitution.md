@@ -72,11 +72,14 @@ Rationale: Performance is a core quality attribute, not a post-release enhanceme
 
 ## Architecture and Folder Conventions
 
-- All API route handlers MUST live under `backend/app/api/v1/` only.
-- Business logic MUST live in `backend/app/services/` and MUST NOT be implemented in routes.
-- Third-party API wrappers MUST live in `backend/app/integrations/`.
-- New database models MUST live in `backend/app/models/`.
-- Data validation and serialization schemas MUST live in `backend/app/schemas/`.
+- The backend is organised by feature (amended 2026-11-16): each feature is one folder
+  `backend/app/<feature>/` holding `router.py` (routes), `service.py` (logic), `schemas.py`
+  (validation/serialization) and `models.py` (tables), plus `prompts/` or `data/` if it needs them.
+- Route handlers MUST only handle HTTP in/out; business logic MUST live in the feature's service
+  module and MUST NOT be implemented in routes.
+- Shared plumbing (settings, database, dependencies, logging) lives in `backend/app/core/`.
+  All LLM calls MUST go through `backend/app/core/llm.py`.
+- `backend/app/main.py` includes one router per feature.
 - Frontend API calls MUST go through `src/lib/api/`; raw `fetch()` in components is forbidden.
 
 ## Delivery Workflow and Quality Gates

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionContext } from '../context/SessionContext'
 import WritingCoach, { stepFromReport } from './WritingCoach'
 import Report from './Report'
 import Start, { CRITERIA } from './Start'
+import ModelAnswer from './ModelAnswer'
+import History from './History'
 import EditPass, { COPS } from './EditPass'
 import WritingCoachPanel from './WritingCoachPanel'
 import { colourSegments, missingSteps } from './colours'
@@ -13,9 +15,9 @@ import { wc, wcParent } from './wcApi'
 vi.mock('./wcApi', () => ({
   wc: {
     reminder: vi.fn(), createSession: vi.fn(), decode: vi.fn(), report: vi.fn(),
-    listSessions: vi.fn(), overview: vi.fn(),
+    listSessions: vi.fn(), overview: vi.fn(), modelAnswer: vi.fn(),
   },
-  wcParent: { sessions: vi.fn(), conventions: vi.fn(), getSettings: vi.fn(), putSettings: vi.fn() },
+  wcParent: { sessions: vi.fn(), progress: vi.fn(), getSettings: vi.fn(), putSettings: vi.fn() },
 }))
 
 const ITEM = {
@@ -27,10 +29,10 @@ const ITEM = {
 }
 const REMINDER = {
   focus_week: 2, focus_title: 'Cite and Explain', focus_text: 'Use two pieces of evidence.',
-  last_next_time: 'Use two dates', rubric_override: null, suggested_subject: 'history',
+  last_next_time: 'Use two dates', suggested_subject: 'history',
   is_rest_day: false, history_strand: 'A',
 }
-const REVIEW = {
+const OLD_REVIEW = {
   level: '3-', percent: 72, summary: 'You answered clearly.', allPartsAnswered: false,
   missedParts: ['Why it mattered today'],
   scores: {
@@ -54,11 +56,34 @@ const REVIEW = {
   },
   contentLevel: '3', contentPercent: 75,
 }
+const REVIEW = {
+  level: '2+', percent: 69, summary: 'You answered clearly.', allPartsAnswered: false,
+  missedParts: ['Why it mattered today'], hasSpecificEvidence: true,
+  overall: { level: '2+', percent: 69, capApplied: false },
+  criteria: {
+    understanding: { level: '3', percent: 74, note: 'You answered clearly.', nextStep: 'Add one thoughtful idea.' },
+    evidence: { level: '2+', percent: 68, note: 'One date.', nextStep: 'Explain how your date proves your point.' },
+    communication: {
+      level: '2', percent: 65, note: 'Some errors.', nextStep: 'Write 5 to 7 full sentences.',
+      sentenceCount: 2, repeatedOpeners: ['This tract'],
+      errors: [{ original: 'grand river', correction: 'Grand River', type: 'capitalization', category: 'capital_place', rule: 'Names of places need capitals' }],
+    },
+  },
+  sentenceTags: [
+    { sentence: 'The Acadians were deported.', tag: 'answer' },
+    { sentence: 'Governor Lawrence ordered it in 1755.', tag: 'cite' },
+  ],
+  strengths: ['Clear start.'], nextSteps: ['Add a second date.'], pushQuestion: 'What would a Mi\'kmaw family say?',
+  sentenceUpgrade: { original: 'It was bad.', better: 'It tore families apart.' },
+}
 const TRANSCRIPT = 'The Acadians were deported. Governor Lawrence ordered it in 1755. It was bad.'
 const REPORT = {
   session: { id: 's1', subject: 'history', status: 'draft_reviewed', item: ITEM, decode: { command_words_correct: true, parts_correct: true, focus_correct: false } },
   submissions: { draft: { id: 'd1', original: TRANSCRIPT, confirmed: TRANSCRIPT, diff: [], word_count: 14, review: REVIEW } },
 }
+
+const withReview = (review) => ({ ...REPORT, submissions: { draft: { ...REPORT.submissions.draft, review } } })
+const OLD_REPORT = withReview(OLD_REVIEW)
 
 function renderApp(profile = { id: 'p1', displayName: 'Sam', grade: '7' }) {
   const navigateTo = vi.fn()
@@ -107,11 +132,23 @@ describe('Start (success criteria)', () => {
     expect(onBegin).toHaveBeenCalledWith('history', '')
   })
 
-  it('shows the focus week, his last goal and the teacher rubric when set', () => {
-    render(<Start reminder={{ ...REMINDER, rubric_override: 'Use two quotes.' }} onBegin={() => {}} onHistory={() => {}} />)
+  it('shows the focus week but no goal to keep', () => {
+    render(<Start reminder={REMINDER} onBegin={() => {}} onHistory={() => {}} />)
     expect(screen.getByText(/Week 2 focus: Cite and Explain/)).toBeInTheDocument()
-    expect(screen.getByText(/Use two dates/)).toBeInTheDocument()
-    expect(screen.getByText('Use two quotes.')).toBeInTheDocument()
+    expect(screen.queryByText(/Use two dates/)).not.toBeInTheDocument()
+  })
+
+  it('shows the teacher\'s Level 4 column in kid-friendly words', () => {
+    render(<Start reminder={REMINDER} onBegin={() => {}} onHistory={() => {}} />)
+    const card = screen.getByRole('region', { name: 'What Level 4 looks like' })
+    expect(card).toHaveTextContent('Understand: answer the whole question + one insight')
+    expect(card).toHaveTextContent('Evidence: specific proof + explain how it supports you')
+    expect(card).toHaveTextContent('Communicate: 5–7 complete sentences, varied openings, check capitals/spelling/punctuation')
+  })
+
+  it('asks for 5 to 7 sentences, not a word count', () => {
+    expect(CRITERIA.join(' ')).toMatch(/5 to 7 complete sentences/)
+    expect(CRITERIA.join(' ')).not.toMatch(/150/)
   })
 
   it('needs the typed question for a school question', async () => {
@@ -125,29 +162,326 @@ describe('Start (success criteria)', () => {
 })
 
 describe('Report', () => {
-  it('shows level, step scores, what he missed, colours and how to improve', () => {
+  it('shows the overall mark and the three criteria, each with its next step', () => {
     render(<Report report={REPORT} kind="draft" />)
-    expect(screen.getByText(/Level 3-/)).toBeInTheDocument()
-    expect(screen.getByText('72%')).toBeInTheDocument()
-    // weakest step is flagged
-    const extend = screen.getByText('Extend', { selector: 'span' }).closest('li')
-    expect(within(extend).getByText('Work on this first')).toBeInTheDocument()
+    expect(screen.getByText(/Level 2\+/)).toBeInTheDocument()
+    expect(screen.getByText('69%')).toBeInTheDocument()
+    const marks = screen.getByRole('region', { name: 'Your three marks' })
+    const cards = within(marks).getAllByRole('listitem')
+    expect(cards.map((c) => within(c).getByRole('heading').textContent)).toEqual(['Understanding', 'Evidence', 'Communication'])
+    expect(cards[0]).toHaveTextContent('74%')
+    expect(cards[0]).toHaveTextContent('Add one thoughtful idea.')
+    expect(cards[1]).toHaveTextContent('Explain how your date proves your point.')
+    expect(cards[2]).toHaveTextContent('Write 5 to 7 full sentences.')
+  })
+
+  it('flags the lowest criterion to work on first', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    const flag = screen.getByText('Work on this first')
+    expect(flag.closest('li')).toHaveTextContent('Communication')
+    expect(screen.getAllByText('Work on this first')).toHaveLength(1)
+  })
+
+  it('explains the cap only when it was applied', () => {
+    const { unmount } = render(<Report report={REPORT} kind="draft" />)
+    expect(screen.queryByText(/no quote or specific fact/)).not.toBeInTheDocument()
+    unmount()
+    render(<Report report={withReview({ ...REVIEW, overall: { ...REVIEW.overall, capApplied: true } })} kind="draft" />)
+    expect(screen.getByText(/no quote or specific fact/)).toBeInTheDocument()
+  })
+
+  it('reports the sentence count against the target and repeated openers', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    const box = screen.getByRole('region', { name: 'Your sentences' })
+    expect(box).toHaveTextContent('2 sentences')
+    expect(box).toHaveTextContent('The target is 5 to 7, so add more')
+    expect(box).toHaveTextContent('This tract')
+  })
+
+  it('says when the sentence count is on target or too long', () => {
+    const count = (n) => withReview({
+      ...REVIEW,
+      criteria: { ...REVIEW.criteria, communication: { ...REVIEW.criteria.communication, sentenceCount: n, repeatedOpeners: [] } },
+    })
+    const { unmount } = render(<Report report={count(6)} kind="draft" />)
+    expect(screen.getByRole('region', { name: 'Your sentences' })).toHaveTextContent('in the 5 to 7 target')
+    unmount()
+    render(<Report report={count(9)} kind="draft" />)
+    expect(screen.getByRole('region', { name: 'Your sentences' })).toHaveTextContent('so tighten it')
+  })
+
+  it('lists the mistakes to fix before handing it in', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    const section = screen.getByRole('region', { name: 'Fix these before you hand it in' })
+    expect(within(section).getByText('Grand River')).toBeInTheDocument()
+    expect(within(section).getByText('Names of places need capitals')).toBeInTheDocument()
+  })
+
+  it('keeps the colours as coaching, what he missed and how to improve', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    expect(screen.getByText(/do not change your mark/)).toBeInTheDocument()
     expect(screen.getByText('Why it mattered today')).toBeInTheDocument()
-    expect(screen.getByText(/No sentence matched these steps/)).toHaveTextContent('Restate, Explain, Extend')
     const answer = screen.getByTestId('coloured-answer')
     expect(answer.querySelector('mark[data-step="answer"]')).toHaveTextContent('The Acadians were deported.')
     expect(screen.getByText('Add a second date.')).toBeInTheDocument()
     expect(screen.getByText('It tore families apart.')).toBeInTheDocument()
-    expect(screen.getByText(/in the 150 to 250|add more detail/)).toBeInTheDocument()
     expect(screen.getByText(/you missed the thinking focus/)).toBeInTheDocument()
+  })
+
+  it('drops the old step scores, four areas, conventions score and word target', () => {
+    render(<Report report={REPORT} kind="draft" />)
+    expect(screen.queryByText('Your score for each step')).not.toBeInTheDocument()
+    expect(screen.queryByText('The four areas')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Conventions score/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/150 to 250/)).not.toBeInTheDocument()
   })
 
   it('compares the rewrite with the draft', () => {
     const rewrite = { ...REPORT.submissions.draft, id: 'r1', review: { ...REVIEW, level: '3+', percent: 78, missedParts: [] } }
     render(<Report report={{ ...REPORT, submissions: { ...REPORT.submissions, rewrite } }} kind="rewrite" />)
-    expect(screen.getByText(/went up 6 percent/)).toBeInTheDocument()
+    expect(screen.getByText(/went up 9 percent/)).toBeInTheDocument()
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('Rewrite')).toBeInTheDocument()
+  })
+
+  it('shows whether the draft mistakes were fixed in the rewrite', () => {
+    const fixed = [
+      { original: 'grand river', correction: 'Grand River', status: 'fixed' },
+      { original: 'haudenosaunee', correction: 'Haudenosaunee', status: 'still_there' },
+    ]
+    const rewrite = { ...REPORT.submissions.draft, id: 'r1', fixed_errors: fixed, review: REVIEW }
+    render(<Report report={{ ...REPORT, submissions: { ...REPORT.submissions, rewrite } }} kind="rewrite" />)
+    const section = screen.getByRole('region', { name: 'Fixed errors' })
+    expect(within(section).getByText('You fixed 1 of 2.')).toBeInTheDocument()
+    expect(within(section).getByText('Fixed')).toBeInTheDocument()
+    expect(within(section).getByText('Still there')).toBeInTheDocument()
+  })
+})
+
+describe('Report for an older review', () => {
+  it('keeps the old layout: step scores, four areas and conventions', () => {
+    render(<Report report={OLD_REPORT} kind="draft" />)
+    expect(screen.getByText(/Level 3-/)).toBeInTheDocument()
+    const extend = screen.getByText('Extend', { selector: 'span' }).closest('li')
+    expect(within(extend).getByText('Work on this first')).toBeInTheDocument()
+    expect(screen.getByText('The four areas')).toBeInTheDocument()
+    const section = screen.getByRole('region', { name: 'Conventions' })
+    expect(within(section).getByText(/Conventions score:/)).toHaveTextContent('1/2')
+    expect(within(section).getByText(/Your ideas earned Level 3, so your level is 3-/)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Your three marks' })).not.toBeInTheDocument()
+  })
+
+  it('copes with the oldest reviews that have no conventions block', () => {
+    render(<Report report={withReview({ ...OLD_REVIEW, conventions: [] })} kind="draft" />)
+    expect(screen.queryByRole('region', { name: 'Conventions' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Model answer section', () => {
+  const SESSION = { id: 's1', item: { ...ITEM, extend_hints: ['Go deeper.'] } }
+  const toggle = () => screen.getByRole('button', { name: /Level 4 model answer/ })
+
+  it('stays closed and costs nothing until he opens it', () => {
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(wc.modelAnswer).not.toHaveBeenCalled()
+  })
+
+  it('writes it on the first open, then closes and reopens without asking again', async () => {
+    let done
+    wc.modelAnswer.mockReturnValue(new Promise((resolve) => { done = resolve }))
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    await user.click(toggle())
+    expect(wc.modelAnswer).toHaveBeenCalledWith('p1', 's1')
+    expect(await screen.findByText(/Writing the model answer/)).toBeInTheDocument()
+    done({ model_answer: 'A strong answer.', extend_hints: ['Go deeper.'] })
+    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
+    expect(screen.getByText('Go deeper.')).toBeInTheDocument()
+    await user.click(toggle())
+    expect(screen.queryByText('A strong answer.')).not.toBeInTheDocument()
+    await user.click(toggle())
+    expect(screen.getByText('A strong answer.')).toBeInTheDocument()
+    expect(wc.modelAnswer).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a saved answer without asking for a new one', async () => {
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={{ ...SESSION, item: { ...SESSION.item, model_answer: 'Saved answer.' } }} />)
+    await user.click(toggle())
+    expect(screen.getByText('Saved answer.')).toBeInTheDocument()
+    expect(wc.modelAnswer).not.toHaveBeenCalled()
+  })
+
+  it('offers Try again after a failure', async () => {
+    wc.modelAnswer.mockRejectedValueOnce(new Error('The AI helper is busy right now.'))
+    wc.modelAnswer.mockResolvedValueOnce({ model_answer: 'A strong answer.', extend_hints: [] })
+    const user = userEvent.setup()
+    render(<ModelAnswer profileId="p1" session={SESSION} />)
+    await user.click(toggle())
+    expect(await screen.findByRole('alert')).toHaveTextContent('busy right now')
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('A strong answer.')).toBeInTheDocument()
+  })
+})
+
+describe('After the results', () => {
+  const UNMARKED = {
+    session: { ...REPORT.session, status: 'started' },
+    submissions: { draft: { id: 'd1', original: 'Saved words', confirmed: 'Saved words', diff: [], word_count: 2, review: null } },
+  }
+
+  /** Reopen a practice waiting to be marked, then mark it, to reach the results. */
+  async function reachResults() {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.confirm = vi.fn().mockResolvedValue({})
+    wc.review = vi.fn().mockResolvedValue({})
+    wc.report.mockResolvedValueOnce(UNMARKED).mockResolvedValue(REPORT)
+    const app = renderApp()
+    await app.user.click(await screen.findByRole('button', { name: 'This is right. Mark it' }))
+    await screen.findByText('How you did')
+    return app
+  }
+
+  it('shows the results with a closed model answer and no form to fill in', async () => {
+    await reachResults()
+    expect(screen.getByRole('button', { name: /Level 4 model answer/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'See the model answer' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save and finish' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/One thing I will do next time/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rewrite it one level higher' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New practice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'My results' })).toBeInTheDocument()
+  })
+
+  it('counts as finished, so coming back opens the start page', async () => {
+    await reachResults()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+  })
+
+  it('opens the start page, not old results, for a practice that was already marked', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.report.mockResolvedValue(REPORT)
+    renderApp()
+    await screen.findByText(/Before you start/)
+    expect(screen.queryByText('How you did')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+  })
+
+  it('New practice goes to the start page', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'New practice' }))
+    expect(await screen.findByText(/Before you start/)).toBeInTheDocument()
+  })
+
+  it('keeps his place if he chose to rewrite and the page reloads', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'Rewrite it one level higher' }))
+    await screen.findByRole('heading', { name: 'Rewrite your answer' })
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+    cleanup()
+    wc.report.mockResolvedValue(REPORT)
+    renderApp()
+    expect(await screen.findByRole('heading', { name: 'Rewrite your answer' })).toBeInTheDocument()
+  })
+
+  it('backing out of a rewrite means he chose not to write it', async () => {
+    const { user } = await reachResults()
+    await user.click(screen.getByRole('button', { name: 'Rewrite it one level higher' }))
+    await user.click(await screen.findByRole('button', { name: /Back to my draft report/ }))
+    await screen.findByText('How you did')
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBeNull()
+    cleanup()
+    renderApp()
+    expect(await screen.findByText(/Before you start/)).toBeInTheDocument()
+  })
+
+  it('does not offer a second rewrite once one has been marked', async () => {
+    window.localStorage.setItem('mathBuddy.wc.activeSession', 's1')
+    wc.confirm = vi.fn().mockResolvedValue({})
+    wc.review = vi.fn().mockResolvedValue({})
+    const draft = REPORT.submissions.draft
+    const rewrite = { ...draft, id: 'r1', review: REVIEW }
+    wc.report
+      .mockResolvedValueOnce({ ...REPORT, submissions: { draft, rewrite: { ...rewrite, review: null } } })
+      .mockResolvedValue({ ...REPORT, submissions: { draft, rewrite } })
+    const { user } = renderApp()
+    await user.click(await screen.findByRole('button', { name: 'This is right. Mark it' }))
+    await screen.findByText('How you did')
+    await user.click(screen.getByRole('button', { name: /Back to my draft report/ }))
+    await screen.findByText(/Your draft report/)
+    expect(screen.queryByRole('button', { name: 'Rewrite it one level higher' })).not.toBeInTheDocument()
+  })
+})
+
+describe('My results', () => {
+  const ROW = { id: 's1', created_at: '2026-11-02T15:00:00Z', subject: 'history', question: 'Why did X?', draft: { level: '2+', percent: 69 }, rewrite: null }
+  const emptyOverview = {
+    session_count: 1, recent_count: 1, sessions_with_missed_parts: 0, command_words_missed: [],
+    top_errors: [], timeline: [], average_sentence_count: 4, criteria: [],
+  }
+  const historyReport = { ...REPORT, session: { ...REPORT.session, created_at: '2026-11-02T15:00:00Z' } }
+
+  async function openPastPractice(onRewrite, report = historyReport) {
+    wc.listSessions.mockResolvedValue([ROW])
+    wc.overview.mockResolvedValue(emptyOverview)
+    wc.report.mockResolvedValue(report)
+    const user = userEvent.setup()
+    render(<History profileId="p1" onBack={() => {}} onNew={() => {}} onRewrite={onRewrite} />)
+    await user.click(await screen.findByRole('button', { name: /Why did X\?/ }))
+    await screen.findByText('Back to my results')
+    return user
+  }
+
+  it('offers a rewrite on a past practice that has none', async () => {
+    const onRewrite = vi.fn()
+    const user = await openPastPractice(onRewrite)
+    await user.click(await screen.findByRole('button', { name: 'Rewrite it one level higher' }))
+    expect(onRewrite).toHaveBeenCalledWith(historyReport)
+  })
+
+  it('does not offer a rewrite once one exists', async () => {
+    const rewrite = { ...REPORT.submissions.draft, id: 'r1', review: null }
+    await openPastPractice(vi.fn(), { ...historyReport, submissions: { ...REPORT.submissions, rewrite } })
+    expect(screen.queryByRole('button', { name: 'Rewrite it one level higher' })).not.toBeInTheDocument()
+  })
+
+  it('opens the rewrite step from My results and remembers it', async () => {
+    wc.listSessions.mockResolvedValue([ROW])
+    wc.overview.mockResolvedValue(emptyOverview)
+    wc.report.mockResolvedValue(historyReport)
+    const { user } = renderApp()
+    await user.click(await screen.findByRole('button', { name: 'My results' }))
+    await user.click(await screen.findByRole('button', { name: /Why did X\?/ }))
+    await user.click(await screen.findByRole('button', { name: 'Rewrite it one level higher' }))
+    expect(await screen.findByRole('heading', { name: 'Rewrite your answer' })).toBeInTheDocument()
+    expect(window.localStorage.getItem('mathBuddy.wc.activeSession')).toBe('s1')
+    expect(window.localStorage.getItem('mathBuddy.wc.rewriting')).toBe('s1')
+    expect(screen.getByRole('button', { name: /Back to my draft report/ })).toBeInTheDocument()
+  })
+
+  const OVERVIEW = {
+    session_count: 2, recent_count: 2, sessions_with_missed_parts: 0, command_words_missed: [],
+    top_errors: [], timeline: [], average_sentence_count: 4,
+    criteria: [{ key: 'communication', average: 65 }, { key: 'evidence', average: 68 }, { key: 'understanding', average: 74 }],
+  }
+
+  it('ranks the three criteria, weakest first, and uses the sentence target', async () => {
+    wc.listSessions.mockResolvedValue([])
+    wc.overview.mockResolvedValue(OVERVIEW)
+    render(<History profileId="p1" onBack={() => {}} onNew={() => {}} />)
+    const region = await screen.findByRole('region', { name: 'Where you are lagging' })
+    expect(within(region).getByText(/Weakest first/)).toHaveTextContent('Communication needs the most work')
+    expect(within(region).getByText('65%')).toBeInTheDocument()
+    expect(within(region).getByText(/average 4 sentences. The target is 5 to 7/)).toBeInTheDocument()
+  })
+
+  it('hides the ranking when only older reviews exist', async () => {
+    wc.listSessions.mockResolvedValue([])
+    wc.overview.mockResolvedValue({ ...OVERVIEW, criteria: [] })
+    render(<History profileId="p1" onBack={() => {}} onNew={() => {}} />)
+    const region = await screen.findByRole('region', { name: 'Where you are lagging' })
+    expect(within(region).queryByText(/Weakest first/)).not.toBeInTheDocument()
   })
 })
 
@@ -159,7 +493,10 @@ describe('stepFromReport', () => {
     expect(stepFromReport({ ...base, submissions: { draft: sub() } }).step).toBe('confirm')
     expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c' }) } }).step).toBe('confirm')
     expect(stepFromReport({ session: { status: 'started', decode: { parts_correct: true } }, submissions: {} }).step).toBe('write')
-    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c', review: {} }) } })).toEqual({ step: 'report', kind: 'draft' })
+    // reviewed practice is finished, unless he chose to rewrite it
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ confirmed: 'c', review: {} }) } })).toBeNull()
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }) } }, { rewriting: true })).toEqual({ step: 'write', kind: 'rewrite' })
+    expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }), rewrite: sub({ review: {} }) } }, { rewriting: true })).toBeNull()
     expect(stepFromReport({ ...base, submissions: { draft: sub({ review: {} }), rewrite: sub() } }).kind).toBe('rewrite')
     expect(stepFromReport({ session: { status: 'done' }, submissions: {} })).toBeNull()
   })
@@ -337,20 +674,35 @@ describe('WritingCoachPanel (parent view)', () => {
       { id: 's1', created_at: '2026-11-02T15:00:00Z', subject: 'history', question: 'Why did X?', draft: { level: '3-', percent: 72 }, rewrite: null,
         corrections: [{ kind: 'draft', changes: [{ op: 'replace', before: 'Haldiman', after: 'Haldimand', suspect: true }] }] },
     ])
-    wcParent.conventions.mockResolvedValue({
-      trend: [{ date: '2026-11-02T15:00:00Z', subject: 'history', draft_score: 1, rewrite_score: 2, errors_flagged: 3, errors_fixed: 2 }],
+    wcParent.progress.mockResolvedValue({
+      trend: [{
+        date: '2026-11-02T15:00:00Z', subject: 'history',
+        understanding: { level: '3', percent: 74 }, evidence: { level: '2+', percent: 68 },
+        communication: { level: '2', percent: 65 }, overall: { level: '2+', percent: 69 },
+        cap_applied: true, errors_flagged: 3, errors_fixed: 2,
+      }],
+      averages: { understanding: 74, evidence: 68, communication: 65, overall: 69 },
+      lowest: 'communication',
       top_errors: [{ category: 'capital_place', label: 'capitals on place names', count: 4 }],
     })
-    wcParent.getSettings.mockResolvedValue({ history_strand: 'A', focus_week: 1, rubric_override: null })
-    wcParent.putSettings.mockResolvedValue({ history_strand: 'B', focus_week: 1, rubric_override: null })
+    wcParent.getSettings.mockResolvedValue({ history_strand: 'A', focus_week: 1 })
+    wcParent.putSettings.mockResolvedValue({ history_strand: 'B', focus_week: 1 })
     const user = userEvent.setup()
     render(<WritingCoachPanel token="tok" profileId="p1" />)
 
     expect(await screen.findByText('Why did X?')).toBeInTheDocument()
     expect(screen.getByText('3- (72%)')).toBeInTheDocument()
     expect(screen.queryByText(/feedback/i)).not.toBeInTheDocument()
-    // conventions trend, most common mistakes, and what he changed while checking the text
-    expect(await screen.findByText(/Fixed 2 of 3 draft mistakes/)).toBeInTheDocument()
+    // each criterion trended separately, the lowest one marked, and the cap shown
+    const trend = await screen.findByRole('table', { name: 'Marks for each criterion' })
+    const row = (name) => within(trend).getByRole('row', { name: new RegExp(`^${name}`) })
+    expect(row('Understanding')).toHaveTextContent('3')
+    expect(row('Evidence')).toHaveTextContent('2+')
+    expect(row('Communication')).toHaveTextContent('65% lowest')
+    expect(row('Overall')).toHaveTextContent('2+ capped')
+    expect(row('Draft mistakes fixed')).toHaveTextContent('2 of 3')
+    expect(screen.queryByLabelText(/rubric/i)).not.toBeInTheDocument()
+    // most common mistakes, and what he changed while checking the text
     expect(screen.getByText('capitals on place names: 4')).toBeInTheDocument()
     expect(screen.getByText(/He changed 1 word while checking the text/)).toBeInTheDocument()
     expect(screen.getByText(/\u201cHaldiman\u201d \u2192 \u201cHaldimand\u201d/)).toBeInTheDocument()
@@ -360,45 +712,6 @@ describe('WritingCoachPanel (parent view)', () => {
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     await waitFor(() => expect(wcParent.putSettings).toHaveBeenCalledWith('tok', 'p1', expect.objectContaining({ history_strand: 'B' })))
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-  })
-})
-
-describe('Conventions in the report', () => {
-  it('lists the mistakes with rules, and explains the level step-down', () => {
-    render(<Report report={REPORT} kind="draft" />)
-    const section = screen.getByRole('region', { name: 'Conventions' })
-    expect(within(section).getByText(/Conventions score:/)).toHaveTextContent('1/2')
-    expect(within(section).getByText(/lowered your level by one step/)).toBeInTheDocument()
-    expect(within(section).getByText(/Your ideas earned Level 3, so your level is 3-/)).toBeInTheDocument()
-    expect(within(section).getByText('Fix these before you hand it in')).toBeInTheDocument()
-    expect(within(section).getByText('Grand River')).toBeInTheDocument()
-    expect(within(section).getByText('Names of places need capitals')).toBeInTheDocument()
-  })
-
-  it('comes after the improvement advice', () => {
-    render(<Report report={REPORT} kind="draft" />)
-    const improve = screen.getByRole('region', { name: 'How to improve' })
-    const conv = screen.getByRole('region', { name: 'Conventions' })
-    expect(improve.compareDocumentPosition(conv) & window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  it('shows whether the draft mistakes were fixed in the rewrite', () => {
-    const fixed = [
-      { original: 'grand river', correction: 'Grand River', status: 'fixed' },
-      { original: 'haudenosaunee', correction: 'Haudenosaunee', status: 'still_there' },
-    ]
-    const rewrite = { ...REPORT.submissions.draft, id: 'r1', fixed_errors: fixed, review: { ...REVIEW, conventions: { score: 2, errors: [], levelAdjustment: 0 } } }
-    render(<Report report={{ ...REPORT, submissions: { ...REPORT.submissions, rewrite } }} kind="rewrite" />)
-    const section = screen.getByRole('region', { name: 'Fixed errors' })
-    expect(within(section).getByText('You fixed 1 of 2.')).toBeInTheDocument()
-    expect(within(section).getByText('Fixed')).toBeInTheDocument()
-    expect(within(section).getByText('Still there')).toBeInTheDocument()
-  })
-
-  it('copes with older reviews that have no conventions block', () => {
-    const old = { ...REVIEW, conventions: [] }
-    render(<Report report={{ ...REPORT, submissions: { draft: { ...REPORT.submissions.draft, review: old } } }} kind="draft" />)
-    expect(screen.queryByRole('region', { name: 'Conventions' })).not.toBeInTheDocument()
   })
 })
 

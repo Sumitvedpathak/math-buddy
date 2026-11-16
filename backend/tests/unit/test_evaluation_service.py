@@ -8,9 +8,9 @@ Unit tests for evaluation_service.py:
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from app.services.evaluation_service import evaluate_answers
-from app.schemas.evaluation import EvaluateAnswersRequest
-from app.schemas.questions import QuestionSchema
+from app.practice.evaluation_service import evaluate_answers
+from app.practice.schemas import EvaluateAnswersRequest
+from app.practice.schemas import QuestionSchema
 
 
 def _make_request(questions=None, answers=None):
@@ -34,7 +34,7 @@ MOCK_LLM_RESULT = {
 
 @pytest.mark.asyncio
 async def test_total_score_computed_correctly():
-    with patch("app.services.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
+    with patch("app.practice.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
         result = await evaluate_answers(_make_request())
     assert result.total_score == 3
     assert result.max_score == 4
@@ -42,7 +42,7 @@ async def test_total_score_computed_correctly():
 
 @pytest.mark.asyncio
 async def test_topic_breakdown_keys():
-    with patch("app.services.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
+    with patch("app.practice.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
         result = await evaluate_answers(_make_request())
     assert "Algebra" in result.topic_breakdown
     assert "Vedic Maths" in result.topic_breakdown
@@ -52,7 +52,7 @@ async def test_topic_breakdown_keys():
 async def test_missing_answer_scores_zero():
     """Question with no submitted answer gets 0 marks when LLM omits it."""
     partial_llm = {"results": [{"question_id": "q1", "marks": 2, "feedback": "Correct!"}]}
-    with patch("app.services.evaluation_service.call_llm", new=AsyncMock(return_value=partial_llm)):
+    with patch("app.practice.evaluation_service.call_llm", new=AsyncMock(return_value=partial_llm)):
         result = await evaluate_answers(_make_request())
     q2_result = next(r for r in result.results if r.question_id == "q2")
     assert q2_result.marks == 0
@@ -60,6 +60,6 @@ async def test_missing_answer_scores_zero():
 
 @pytest.mark.asyncio
 async def test_results_length_matches_questions():
-    with patch("app.services.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
+    with patch("app.practice.evaluation_service.call_llm", new=AsyncMock(return_value=MOCK_LLM_RESULT)):
         result = await evaluate_answers(_make_request())
     assert len(result.results) == 2

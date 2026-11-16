@@ -1,6 +1,6 @@
 """Render the *teaching* part of each curriculum lesson from the source PDFs.
 
-For every lesson in backend/app/data/curriculum.json this finds the lesson's
+For every lesson in backend/app/curriculum/data/curriculum.json this finds the lesson's
 pages in resources/*.pdf, keeps the pages up to (not including) the textbook's own
 numbered exercises, crops away the e-book chrome (Home/Quit buttons, page footer)
 and writes them as JPEGs to frontend/public/lessons/<lesson id>/<n>.jpg. The
@@ -23,7 +23,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 RESOURCES = ROOT / "resources"
-CURRICULUM = ROOT / "backend" / "app" / "data" / "curriculum.json"
+CURRICULUM = ROOT / "backend" / "app" / "curriculum" / "data" / "curriculum.json"
 OUT_DIR = ROOT / "frontend" / "public" / "lessons"
 
 DPI = 110

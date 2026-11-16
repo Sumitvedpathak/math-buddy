@@ -1,9 +1,9 @@
 import pytest
 
-from app.integrations.langchainrouter import LLMServiceError
+from app.core.llm import LLMServiceError
 from tests.conftest import ADMIN_TOKEN
 
-from .samples import GOOD_ITEM, GOOD_REVIEW
+from .samples import GOOD_ITEM, GOOD_REVIEW, MODEL_REPLY
 
 TRANSCRIPT = "The Acadians were deprted in 1755. Governor Lawrence ordered it. [illegible] lost farms."
 IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
@@ -21,6 +21,8 @@ def llm(monkeypatch):
             return {"transcript": TRANSCRIPT}, usage
         if "marking a written answer" in prompt:
             return GOOD_REVIEW, usage
+        if "writing a Level 4 model answer" in prompt:
+            return MODEL_REPLY, usage
         return GOOD_ITEM, usage
 
     monkeypatch.setattr("app.writing_coach.agents.call_llm_with_usage", fake)
@@ -94,7 +96,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
 
     # review before confirming is refused; model answer is locked
     assert (await client.post(f"/api/v1/wc/submissions/{sub_id}/review", headers=h)).status_code == 409
-    assert (await client.get(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 403
+    assert (await client.post(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 403
 
     # he may fix a misread word but not add content
     big = TRANSCRIPT + " and a lot of brand new sentences he did not write on paper at all"
@@ -113,7 +115,7 @@ async def test_full_session_flow(client, llm, monkeypatch):
     assert review_call["model"] == "rev/model"
 
     # model answer unlocks after the draft review; editing a reviewed answer is refused
-    assert (await client.get(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 200
+    assert (await client.post(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 200
     assert (await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})).status_code == 409
 
     # rewrite, then log the goal
@@ -121,9 +123,6 @@ async def test_full_session_flow(client, llm, monkeypatch):
     rw_id = rw.json()["submission_id"]
     await client.put(f"/api/v1/wc/submissions/{rw_id}/transcript", headers=h, json={"text": fixed})
     assert (await client.post(f"/api/v1/wc/submissions/{rw_id}/review", headers=h)).status_code == 200
-    fin = await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "Use two dates", "model_move": "It links to today"})
-    assert fin.status_code == 200 and fin.json()["status"] == "done"
-
     # his report and overview
     rep = (await client.get(f"/api/v1/wc/sessions/{sid}/report", headers=h)).json()
     assert rep["submissions"]["draft"]["diff"] and rep["submissions"]["rewrite"]["review"]["level"] == "3-"
@@ -131,11 +130,12 @@ async def test_full_session_flow(client, llm, monkeypatch):
     listing = (await client.get("/api/v1/wc/sessions", headers=h)).json()
     assert listing[0]["draft"]["level"] == "3-" and listing[0]["rewrite"]["percent"] == 72
     ov = (await client.get("/api/v1/wc/overview", headers=h)).json()
-    assert ov["session_count"] == 1 and ov["steps"][0]["step"] == "extend"
+    assert ov["session_count"] == 1 and ov["criteria"][0]["key"] == "evidence"
     assert ov["command_words_missed"] == [["explain", 1]]
 
-    # next session's reminder carries his last goal
-    assert (await client.get("/api/v1/wc/reminder", headers=h)).json()["last_next_time"] == "Use two dates"
+    # there is nothing to save at the end: goals and the finish step are gone
+    assert (await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "x"})).status_code == 405
+    assert "last_next_time" not in (await client.get("/api/v1/wc/reminder", headers=h)).json()
 
 
 async def test_reminder_lists_unfinished_practice_with_its_stage(client, llm):
@@ -156,11 +156,18 @@ async def test_reminder_lists_unfinished_practice_with_its_stage(client, llm):
     await client.put(f"/api/v1/wc/submissions/{sub}/transcript", headers=h, json={"text": TRANSCRIPT})
     await client.post(f"/api/v1/wc/submissions/{sub}/review", headers=h)
     body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert dict(unfinished(body))[sid] == "draft_report"
+    assert sid not in dict(unfinished(body))  # a reviewed practice is finished, with or without a rewrite
 
-    await client.patch(f"/api/v1/wc/sessions/{sid}", headers=h, json={"next_time": "Use two dates"})
+    # a rewrite he has photographed but not had marked is pending again
+    rw = await client.post(f"/api/v1/wc/sessions/{sid}/read", headers=h, json={"kind": "rewrite", "images": [IMG]})
+    rw_id = rw.json()["submission_id"]
     body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert sid not in dict(unfinished(body))  # finished practice is not offered
+    assert dict(unfinished(body))[sid] == "rewrite_check"
+
+    await client.put(f"/api/v1/wc/submissions/{rw_id}/transcript", headers=h, json={"text": TRANSCRIPT})
+    await client.post(f"/api/v1/wc/submissions/{rw_id}/review", headers=h)
+    body = (await client.get("/api/v1/wc/reminder", headers=h)).json()
+    assert sid not in dict(unfinished(body))
 
 
 async def test_rewrite_needs_a_reviewed_draft(client, llm):
@@ -226,17 +233,12 @@ async def test_parent_settings_change_what_the_student_gets(client, llm, admin_t
     h, pid = await make_profile(client)
     admin = {"X-Admin-Token": ADMIN_TOKEN}
     r = await client.put(f"/api/v1/wc/parent/settings?profile_id={pid}", headers=admin,
-                         json={"history_strand": "B", "focus_week": 3, "rubric_override": "Use two quotes."})
-    assert r.json() == {"history_strand": "B", "rubric_override": "Use two quotes.", "focus_week": 3}
+                         json={"history_strand": "B", "focus_week": 3})
+    assert r.json() == {"history_strand": "B", "focus_week": 3}
     rem = (await client.get("/api/v1/wc/reminder", headers=h)).json()
-    assert rem["focus_week"] == 3 and rem["rubric_override"] == "Use two quotes."
+    assert rem["focus_week"] == 3
     s = await start_session(client, h)
     assert s["topic_id"].startswith("b-") and s["focus_week"] == 3
-    # the teacher's rubric reaches the Reviewer prompt
-    sub = (await client.post(f"/api/v1/wc/sessions/{s['id']}/read", headers=h, json={"kind": "draft", "images": [IMG]})).json()
-    await client.put(f"/api/v1/wc/submissions/{sub['submission_id']}/transcript", headers=h, json={"text": TRANSCRIPT})
-    await client.post(f"/api/v1/wc/submissions/{sub['submission_id']}/review", headers=h)
-    assert any("Use two quotes." in c["prompt"] for c in llm if "marking a written answer" in c["prompt"])
 
 
 async def test_topics_rotate_instead_of_repeating(client, llm):

@@ -2,13 +2,15 @@ import asyncio
 import os
 from logging.config import fileConfig
 
-from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.db import connect_args_for, normalize_database_url
-from app.models.tables import Base
+import app.profiles.models  # noqa: F401  (importing a models file registers its tables)
+import app.results.models  # noqa: F401
+import app.writing_coach.models  # noqa: F401
+from alembic import context
+from app.core.db import Base, connect_args_for, normalize_database_url
 
 load_dotenv()
 

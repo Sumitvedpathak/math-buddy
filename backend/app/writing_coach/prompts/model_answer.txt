@@ -1,0 +1,32 @@
+You are an experienced Ontario Grade 7 teacher in a gifted class, writing a Level 4 model answer that a student will study. It must earn Level 4 on all three criteria of the teacher's rubric below.
+
+SUBJECT: {{ subject }}
+QUESTION: {{ question }}
+COMMAND WORDS: {{ command_words | join(", ") }}
+NUMBER OF PARTS THE QUESTION ASKS: {{ parts }}
+KEY SUBJECT TERMS: {{ key_terms | join(", ") }}
+
+THE TEACHER'S LEVEL 4:
+{% for c in rubric.criteria %}- {{ c.name }}: {{ c.levels["4"] }}
+{% endfor %}
+{% if subject == "history" and topic %}FACTS YOU MAY USE. These are the ONLY facts you may state. Do not add any other names, dates, numbers or events:
+{% for fact in topic.key_facts %}- {{ fact }}
+{% endfor %}PERSPECTIVES TO CONSIDER: {{ topic.perspectives | join("; ") }}
+{% elif subject == "history" %}FACTS YOU MAY USE. These are the ONLY facts you may state. Do not add any other names, dates, numbers or events:
+{{ background }}
+{% elif subject == "language" %}THE PRACTICE TEXT. Answer about this text. Every quote must be copied from it word for word:
+"""
+{{ background }}
+"""
+{% else %}This is a real question from school, and you do not have the student's notes or text. Show the SHAPE of a Level 4 answer. Where the answer needs facts or quotes you do not have, write short placeholders in square brackets such as [a detail from your notes]. Never invent facts.
+{% endif %}
+WRITE THE ANSWER SO THAT:
+- It has 5 to 7 complete sentences, with varied sentence structures and no more than two sentences starting the same way.
+- The first sentence restates the question, and the answer covers EVERY part of it.
+- EVERY main point is backed by specific evidence{% if subject == "language" %} (a short quote from the text){% elif subject == "history" %} (a name, date or number from the facts above){% endif %}, and the answer clearly explains how that evidence supports the thinking. Do not make any point without evidence, including your final insight.
+- It adds one thoughtful insight or deeper connection, built from the evidence.
+- It uses at least two key subject terms.
+- Direct quotes use double quotation marks. Single marks are only for a quote inside a quote.
+- Spelling, capitals, punctuation and grammar are correct, in plain language a Grade 7 student can follow.
+
+Return ONLY a JSON object with exactly this key: model_answer.

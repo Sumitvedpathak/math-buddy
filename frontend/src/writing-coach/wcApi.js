@@ -46,8 +46,7 @@ export const wc = {
     request('PUT', `/submissions/${submissionId}/transcript`, { profileId, body: { text } }),
   review: (profileId, submissionId) =>
     request('POST', `/submissions/${submissionId}/review`, { profileId }),
-  modelAnswer: (profileId, id) => request('GET', `/sessions/${id}/model-answer`, { profileId }),
-  finish: (profileId, id, body) => request('PATCH', `/sessions/${id}`, { profileId, body }),
+  modelAnswer: (profileId, id) => request('POST', `/sessions/${id}/model-answer`, { profileId }),
   overview: (profileId) => request('GET', '/overview', { profileId }),
 }
 
@@ -55,8 +54,8 @@ export const wc = {
 export const wcParent = {
   sessions: (adminToken, profileId) =>
     request('GET', `/parent/sessions?profile_id=${encodeURIComponent(profileId)}`, { adminToken }),
-  conventions: (adminToken, profileId) =>
-    request('GET', `/parent/conventions?profile_id=${encodeURIComponent(profileId)}`, { adminToken }),
+  progress: (adminToken, profileId) =>
+    request('GET', `/parent/progress?profile_id=${encodeURIComponent(profileId)}`, { adminToken }),
   getSettings: (adminToken, profileId) =>
     request('GET', `/parent/settings?profile_id=${encodeURIComponent(profileId)}`, { adminToken }),
   putSettings: (adminToken, profileId, body) =>

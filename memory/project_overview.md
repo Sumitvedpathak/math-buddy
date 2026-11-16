@@ -7,7 +7,7 @@ metadata:
 
 Math Buddy is an AI-powered math practice web app (ages 9–12) built with FastAPI backend + React/Vite frontend.
 
-**Backend**: Python/FastAPI at `backend/app/`, LLM via OpenRouter (Gemini 2.0 Flash), prompts as Jinja2 `.txt` files in `backend/prompts/`.
+**Backend**: Python/FastAPI at `backend/app/`, LLM via OpenRouter (Gemini 2.0 Flash), organised by feature (`profiles/`, `curriculum/`, `practice/`, `results/`, `admin/`, `writing_coach/`, shared `core/`), prompts as Jinja2 `.txt` files in each feature's `prompts/` folder.
 
 **Frontend**: React 18 + Vite JSX (not TSX), Tailwind CSS 3 + CSS custom properties, react-sketch-canvas. State in `SessionContext.jsx`. API calls centralised in `src/lib/api.js`.
 

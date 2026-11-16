@@ -13,6 +13,9 @@ export const STEPS = [
 
 export const STEP_BY_KEY = Object.fromEntries(STEPS.map((s) => [s.key, s]))
 
+/** The three criteria of the teacher's rubric, in the order the rubric lists them. */
+export const CRITERIA_LABELS = { understanding: 'Understanding', evidence: 'Evidence', communication: 'Communication' }
+
 /**
  * Cut the transcript into coloured segments using the Reviewer's sentence tags.
  * Tags are matched in order; text between matches stays plain.

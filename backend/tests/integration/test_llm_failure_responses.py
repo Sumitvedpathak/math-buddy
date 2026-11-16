@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from openai import RateLimitError
 
-from app.integrations import langchainrouter as router
-from app.integrations.langchainrouter import BUSY_MESSAGE, LLMServiceError
+from app.core import llm as router
+from app.core.llm import BUSY_MESSAGE, LLMServiceError
 
 GENERATE = {"topics": ["Geometry"], "age_group": "11-12", "question_count": 5, "lesson_id": "7.1"}
 EVALUATE = {
@@ -40,7 +40,7 @@ async def test_evaluate_rate_limit_is_a_503_with_a_friendly_message(client):
 
 async def test_generate_service_error_message_is_passed_through(client):
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(side_effect=LLMServiceError("busy right now")),
     ):
         resp = await client.post("/api/v1/questions/generate", json=GENERATE)

@@ -26,7 +26,7 @@ BODY = {
 
 async def test_lesson_prompt_includes_lesson_context(client):
     mock = AsyncMock(return_value=LESSON_RESPONSE)
-    with patch("app.services.question_service.call_llm", new=mock):
+    with patch("app.practice.question_service.call_llm", new=mock):
         resp = await client.post("/api/v1/questions/generate", json=BODY)
     assert resp.status_code == 200
     prompt = mock.call_args.args[0]
@@ -38,7 +38,7 @@ async def test_lesson_prompt_includes_lesson_context(client):
 
 async def test_lesson_questions_skip_mandatory_type_check(client):
     # Five "lesson" questions would fail the generic mandatory-types validation.
-    with patch("app.services.question_service.call_llm", new=AsyncMock(return_value=LESSON_RESPONSE)):
+    with patch("app.practice.question_service.call_llm", new=AsyncMock(return_value=LESSON_RESPONSE)):
         resp = await client.post("/api/v1/questions/generate", json=BODY)
     assert resp.status_code == 200
     assert {q["problem_type"] for q in resp.json()["questions"]} == {"lesson"}
@@ -55,7 +55,7 @@ async def test_no_lesson_keeps_existing_prompt(client):
         ],
     }
     mock = AsyncMock(return_value=generic_response)
-    with patch("app.services.question_service.call_llm", new=mock):
+    with patch("app.practice.question_service.call_llm", new=mock):
         await client.post("/api/v1/questions/generate", json=generic)
     prompt = mock.call_args.args[0]
     assert "MANDATORY PROBLEM TYPES" in prompt
@@ -64,7 +64,7 @@ async def test_no_lesson_keeps_existing_prompt(client):
 
 async def test_unknown_lesson_returns_422(client):
     mock = AsyncMock(return_value=LESSON_RESPONSE)
-    with patch("app.services.question_service.call_llm", new=mock):
+    with patch("app.practice.question_service.call_llm", new=mock):
         resp = await client.post("/api/v1/questions/generate", json={**BODY, "lesson_id": "99.9"})
     assert resp.status_code == 422
     mock.assert_not_called()

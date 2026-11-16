@@ -1,20 +1,27 @@
 import re
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.writing_coach.levels import (
     LEVELS,
+    band_for_level,
     clamp_percent_to_level,
+    level_for_percent,
     percent_matches_level,
-    step_level,
+)
+from app.writing_coach.rubric import (
+    MODEL_ANSWER_SENTENCES,
+    NO_EVIDENCE_CRITERION_CAP,
+    NO_EVIDENCE_OVERALL_CAP,
+    sentence_stats,
+    split_sentences,
 )
 
 Subject = Literal["history", "language", "school"]
 SubmissionKind = Literal["draft", "rewrite"]
 
 COMMAND_WORDS = ["Describe", "Explain", "Compare", "Analyse", "Evaluate", "Justify"]
-MODEL_ANSWER_WORDS = (130, 280)  # brief asks 150-250; a little tolerance avoids pointless retries
 
 
 def word_count(text: str) -> int:
@@ -31,7 +38,6 @@ class GeneratedItem(BaseModel):
     background: str = Field(min_length=40)
     key_terms: list[str] = Field(min_length=4, max_length=6)
     extend_hints: list[str] = Field(min_length=2, max_length=3)
-    model_answer: str
     text_kind: Literal["card", "novel", "poem", "media"] = "card"
 
     @field_validator("command_words")
@@ -42,12 +48,19 @@ class GeneratedItem(BaseModel):
             raise ValueError("at least one command word")
         return out
 
+
+class ModelAnswer(BaseModel):
+    """The Level 4 model answer, written when the student asks for it."""
+
+    model_answer: str
+
     @field_validator("model_answer")
     @classmethod
     def _model_answer_length(cls, v: str) -> str:
-        lo, hi = MODEL_ANSWER_WORDS
-        if not lo <= word_count(v) <= hi:
-            raise ValueError(f"model_answer must be {lo}-{hi} words, got {word_count(v)}")
+        lo, hi = MODEL_ANSWER_SENTENCES
+        count = len(split_sentences(v))
+        if not lo <= count <= hi:
+            raise ValueError(f"model_answer must be 5 to 7 sentences, got {count}")
         return v
 
 
@@ -55,29 +68,6 @@ class ReaderResult(BaseModel):
     """Handwriting Reader output: the transcription, nothing else."""
 
     transcript: str = Field(min_length=1)
-
-
-Score = Annotated[int, Field(ge=0, le=2)]
-
-
-class StepScore(BaseModel):
-    score: Score
-    note: str = ""
-
-
-class Scores(BaseModel):
-    restate: StepScore
-    answer: StepScore
-    cite: StepScore
-    explain: StepScore
-    extend: StepScore
-
-
-class Categories(BaseModel):
-    knowledge: str = ""
-    thinking: str = ""
-    communication: str = ""
-    application: str = ""
 
 
 class SentenceTag(BaseModel):
@@ -111,8 +101,6 @@ CONVENTION_CATEGORIES = {
 }
 CONVENTION_TYPES = ["capitalization", "sentence", "agreement", "tense", "punctuation", "spelling", "other"]
 MAX_CONVENTION_ERRORS = 10
-# Score 2 = no penalty, 1 = one level step down, 0 = two steps down.
-CONVENTION_ADJUSTMENT = {2: 0, 1: -1, 0: -2}
 
 
 class ConventionError(BaseModel):
@@ -133,70 +121,101 @@ class ConventionError(BaseModel):
         return v if v in CONVENTION_CATEGORIES else "other"
 
 
-class Conventions(BaseModel):
-    score: Score = 2
-    errors: list[ConventionError] = []
-    levelAdjustment: int = 0
-
-    @model_validator(mode="after")
-    def _adjustment_follows_score(self) -> "Conventions":
-        # The app, not the model, decides the level effect: it follows the score.
-        self.levelAdjustment = CONVENTION_ADJUSTMENT[self.score]
-        self.errors = self.errors[:MAX_CONVENTION_ERRORS]
-        return self
-
-
-class Review(BaseModel):
-    """Reviewer output. `level`/`percent` are the FINAL result, after the conventions step-down."""
+class Criterion(BaseModel):
+    """One rubric criterion. The level is the Reviewer's judgement; a stray percent is pulled into it."""
 
     level: str
     percent: int = Field(ge=0, le=100)
-    summary: str
-    allPartsAnswered: bool
-    missedParts: list[str] = []
-    scores: Scores
-    categories: Categories
-    sentenceTags: list[SentenceTag] = []
-    strengths: list[str] = []
-    nextSteps: list[str] = []
-    pushQuestion: str = ""
-    sentenceUpgrade: SentenceUpgrade = SentenceUpgrade()
-    conventions: Conventions = Conventions()
-    # Set by the app: what the content earned before conventions were applied.
-    contentLevel: str | None = None
-    contentPercent: int | None = None
+    note: str = ""
+    nextStep: str = ""
 
     @field_validator("level")
     @classmethod
     def _known_level(cls, v: str) -> str:
-        v = v.strip().replace("−", "-")  # a real minus sign -> hyphen
+        v = v.strip().replace("\u2212", "-")  # a real minus sign -> hyphen
         if v not in LEVELS:
             raise ValueError(f"level must be one of {LEVELS}")
         return v
 
     @model_validator(mode="after")
-    def _consistent(self) -> "Review":
-        # The level is the Reviewer's judgement: pull a stray percent back into its band.
+    def _percent_fits_level(self) -> "Criterion":
         if not percent_matches_level(self.level, self.percent):
             self.percent = clamp_percent_to_level(self.level, self.percent)
-        # Missed parts and the boolean must agree.
-        self.allPartsAnswered = len(self.missedParts) == 0
         return self
 
-    def apply_conventions(self) -> None:
-        """Lower the content level by the conventions step-down (never more than two steps)."""
-        self.contentLevel, self.contentPercent = self.level, self.percent
-        self.level = step_level(self.level, self.conventions.levelAdjustment)
-        self.percent = clamp_percent_to_level(self.level, self.percent)
 
-    def drop_unmatched_conventions(self, transcript: str) -> None:
-        """Keep only errors that really appear in the transcript, and never count a word
-        the Reader marked [?] (ambiguous capital)."""
-        kept = [
-            e for e in self.conventions.errors
+class CommunicationCriterion(Criterion):
+    errors: list[ConventionError] = []
+    # Counted by the app from the transcript, never taken from the model.
+    sentenceCount: int = 0
+    repeatedOpeners: list[str] = []
+
+    @field_validator("errors")
+    @classmethod
+    def _at_most_ten(cls, v: list[ConventionError]) -> list[ConventionError]:
+        return v[:MAX_CONVENTION_ERRORS]
+
+
+class Criteria(BaseModel):
+    understanding: Criterion
+    evidence: Criterion
+    communication: CommunicationCriterion
+
+
+class Overall(BaseModel):
+    level: str = "1-"
+    percent: int = 0
+    capApplied: bool = False
+
+
+class Review(BaseModel):
+    """Reviewer output. `overall` is always worked out here, whatever the model sent."""
+
+    summary: str
+    allPartsAnswered: bool
+    missedParts: list[str] = []
+    hasSpecificEvidence: bool
+    criteria: Criteria
+    overall: Overall = Overall()
+    sentenceTags: list[SentenceTag] = []
+    strengths: list[str] = []
+    nextSteps: list[str] = []
+    pushQuestion: str = ""
+    sentenceUpgrade: SentenceUpgrade = SentenceUpgrade()
+
+    @model_validator(mode="after")
+    def _work_out_marks(self) -> "Review":
+        # Missed parts and the boolean must agree.
+        self.allPartsAnswered = len(self.missedParts) == 0
+
+        c = self.criteria
+        capped = False
+        if not self.hasSpecificEvidence:
+            _, evidence_top = band_for_level(NO_EVIDENCE_CRITERION_CAP)
+            if c.evidence.percent > evidence_top:
+                c.evidence.level, c.evidence.percent = NO_EVIDENCE_CRITERION_CAP, evidence_top
+                capped = True
+        percent = round((c.understanding.percent + c.evidence.percent + c.communication.percent) / 3)
+        if not self.hasSpecificEvidence:
+            _, overall_top = band_for_level(NO_EVIDENCE_OVERALL_CAP)
+            if percent > overall_top:
+                percent = overall_top
+                capped = True
+        self.overall = Overall(level=level_for_percent(percent), percent=percent, capApplied=capped)
+        return self
+
+    def check_against_transcript(self, transcript: str) -> None:
+        """Drop what the transcript does not support, and count sentences ourselves."""
+        self.drop_unmatched_tags(transcript)
+        comm = self.criteria.communication
+        # An error must really appear, and a word the Reader marked [?] (ambiguous capital) never counts.
+        comm.errors = [
+            e for e in comm.errors
             if e.original and e.original in transcript and f"{e.original}[?]" not in transcript
         ]
-        self.conventions = Conventions(score=self.conventions.score, errors=kept)
+        stats = sentence_stats(transcript)
+        comm.sentenceCount = stats["sentenceCount"]
+        comm.repeatedOpeners = stats["repeatedOpeners"]
 
     def drop_unmatched_tags(self, transcript: str) -> None:
         """Keep only sentence tags whose sentence really appears in the transcript."""
@@ -236,12 +255,6 @@ class TranscriptUpdate(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
 
 
-class SessionFinish(BaseModel):
-    next_time: str = Field(min_length=1, max_length=500)
-    model_move: str | None = Field(default=None, max_length=500)
-
-
 class SettingsUpdate(BaseModel):
     history_strand: Literal["A", "B", "both"] | None = None
-    rubric_override: str | None = Field(default=None, max_length=6000)
     focus_week: int | None = Field(default=None, ge=1, le=4)

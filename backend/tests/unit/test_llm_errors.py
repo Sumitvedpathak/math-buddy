@@ -8,9 +8,8 @@ import httpx
 import pytest
 from openai import APIConnectionError, AuthenticationError, RateLimitError
 
-from app.integrations import langchainrouter as router
-from app.integrations import openrouter
-from app.integrations.langchainrouter import BUSY_MESSAGE, FAILED_MESSAGE, LLMServiceError, call_llm
+from app.core import llm as router
+from app.core.llm import BUSY_MESSAGE, FAILED_MESSAGE, LLMServiceError, call_llm
 
 
 def _response(status: int) -> httpx.Response:
@@ -23,11 +22,6 @@ def _model_raising(exc: Exception):
 
 def _model_returning(content):
     return SimpleNamespace(ainvoke=AsyncMock(return_value=SimpleNamespace(content=content)))
-
-
-def test_one_shared_error_class():
-    # The API layer catches openrouter.LLMServiceError; the services raise the router's.
-    assert router.LLMServiceError is openrouter.LLMServiceError
 
 
 async def test_rate_limit_becomes_a_busy_error():
