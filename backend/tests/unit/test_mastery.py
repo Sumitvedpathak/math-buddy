@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.attempt_service import compute_score_pct, is_mastered
+from app.results.service import compute_score_pct, is_mastered
 
 
 @pytest.mark.parametrize(

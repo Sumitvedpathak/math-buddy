@@ -312,9 +312,9 @@ async def test_the_model_answer_is_written_once_and_saved(client, llm):
 
 
 async def test_older_sessions_keep_their_saved_model_answer(client, llm):
-    from app.db import get_session
+    from app.core.db import get_session
     from app.main import app
-    from app.models.tables import WcSession
+    from app.writing_coach.models import WcSession
 
     h, _ = await make_profile(client)
     s = await start_session(client, h)
@@ -373,9 +373,9 @@ async def test_school_model_answer_uses_placeholders_not_invented_facts(client, 
 # ---- older reviews stay readable
 
 async def _make_stored_review_old():
-    from app.db import get_session
+    from app.core.db import get_session
     from app.main import app
-    from app.models.tables import WcReview
+    from app.writing_coach.models import WcReview
 
     async for db in app.dependency_overrides[get_session]():
         rev = await db.scalar(select(WcReview))

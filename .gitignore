@@ -50,3 +50,7 @@ frontend/public/lessons/
 
 # Local SQLite databases (dev/test); never commit
 *.db
+
+# Local test logs
+frontend/test_output.txt
+frontend/test_results.txt

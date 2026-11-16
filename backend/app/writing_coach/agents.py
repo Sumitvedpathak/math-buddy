@@ -15,8 +15,8 @@ from typing import TypeVar
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, ValidationError
 
-from app.config import get_settings
-from app.integrations.langchainrouter import LLMServiceError, call_llm_with_usage
+from app.core.config import get_settings
+from app.core.llm import LLMServiceError, call_llm_with_usage
 from app.writing_coach.rubric import RUBRIC
 from app.writing_coach.schemas import (
     COMMAND_WORDS,

@@ -2,7 +2,7 @@
 
 from sqlalchemy.engine import make_url
 
-from app.db import connect_args_for, normalize_database_url
+from app.core.db import connect_args_for, normalize_database_url
 
 NEON = (
     "postgresql://neondb_owner:p%40ss%2Fword@ep-cool-name-123456.us-east-2.aws.neon.tech"

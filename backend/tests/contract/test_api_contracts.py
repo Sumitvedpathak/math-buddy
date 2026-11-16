@@ -75,7 +75,7 @@ MOCK_EVALUATE_RESPONSE = {
 async def test_generate_questions_response_schema():
     """Response body matches GenerateQuestionsResponse schema."""
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(return_value=MOCK_QUESTIONS_RESPONSE),
     ):
         response = client.post(
@@ -105,7 +105,7 @@ async def test_evaluate_answers_response_schema():
         }
     ]
     with patch(
-        "app.services.evaluation_service.call_llm",
+        "app.practice.evaluation_service.call_llm",
         new=AsyncMock(return_value={
             "results": [
                 {"question_id": questions[0]["id"], "marks": 2, "feedback": "Correct!"}

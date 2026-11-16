@@ -17,9 +17,9 @@ async def client():
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlalchemy.pool import StaticPool
 
-    from app.db import get_session
+    from app.core.db import get_session
     from app.main import app
-    from app.models.tables import Base
+    from app.core.db import Base
 
     engine = create_async_engine(
         "sqlite+aiosqlite://",
@@ -47,6 +47,6 @@ def admin_token(monkeypatch):
     from types import SimpleNamespace
 
     monkeypatch.setattr(
-        "app.api.deps.get_settings", lambda: SimpleNamespace(admin_token=ADMIN_TOKEN)
+        "app.core.deps.get_settings", lambda: SimpleNamespace(admin_token=ADMIN_TOKEN)
     )
     return ADMIN_TOKEN

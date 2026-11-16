@@ -1,6 +1,6 @@
 import pytest
 
-from app.integrations.langchainrouter import LLMServiceError
+from app.core.llm import LLMServiceError
 from tests.conftest import ADMIN_TOKEN
 
 from .samples import GOOD_ITEM, GOOD_REVIEW, MODEL_REPLY

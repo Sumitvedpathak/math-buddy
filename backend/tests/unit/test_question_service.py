@@ -8,8 +8,8 @@ Unit tests for question_service.py:
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from app.services.question_service import generate_questions, _validate_vedic
-from app.schemas.questions import GenerateQuestionsRequest
+from app.practice.question_service import generate_questions, _validate_vedic
+from app.practice.schemas import GenerateQuestionsRequest
 
 
 def _make_request(**kwargs):
@@ -42,9 +42,9 @@ async def test_missing_mandatory_type_raises():
     # Remove all "squares" type questions
     incomplete["questions"] = [q for q in incomplete["questions"] if q["problem_type"] != "squares"]
 
-    from app.integrations.openrouter import LLMServiceError
+    from app.core.llm import LLMServiceError
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(return_value=incomplete),
     ):
         with pytest.raises(LLMServiceError):
@@ -61,9 +61,9 @@ async def test_invalid_vedic_pattern_raises():
         "text": "12 × 25", "difficulty_tier": 3
     }
 
-    from app.integrations.openrouter import LLMServiceError
+    from app.core.llm import LLMServiceError
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(return_value=invalid),
     ):
         with pytest.raises(LLMServiceError):
@@ -77,7 +77,7 @@ async def test_questions_sorted_by_difficulty():
     # Already unsorted in fixture (tiers: 3,2,1,4,5)
 
     with patch(
-        "app.services.question_service.call_llm",
+        "app.practice.question_service.call_llm",
         new=AsyncMock(return_value=unsorted),
     ):
         result = await generate_questions(_make_request())
