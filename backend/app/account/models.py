@@ -110,3 +110,28 @@ class AuthSession(Base):
         DateTime(timezone=True), nullable=False
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LinkCode(Base):
+    """A one-time code that signs one device in as one child. Only its hash is kept."""
+
+    __tablename__ = "link_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    child_profile_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("profiles.id"), nullable=False, index=True
+    )
+    parent_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("parents.id"), nullable=False, index=True
+    )
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        server_default=func.now(),
+    )

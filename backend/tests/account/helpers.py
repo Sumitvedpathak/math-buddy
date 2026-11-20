@@ -36,3 +36,24 @@ async def sign_in(client, id_token, terms=None):
     if terms is not None:
         body["accepted_terms_version"] = terms
     return await client.post("/api/v1/auth/google", json=body)
+
+
+async def parent_headers(client, id_token="token-ana"):
+    resp = await client.post(
+        "/api/v1/auth/google",
+        json={
+            "id_token": id_token,
+            "accepted_terms_version": TERMS,
+            "client": "native",
+        },
+    )
+    assert resp.status_code == 200
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
+async def add_child(client, headers, name="Aarav", grade="7"):
+    resp = await client.post(
+        "/api/v1/children", json={"display_name": name, "grade": grade}, headers=headers
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()

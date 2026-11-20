@@ -1,7 +1,10 @@
-"""Account: sign-in, staying signed in, signing out, "who am I", and children."""
+"""Account: sign-in, staying signed in, signing out, "who am I", children,
+and linking a child's device."""
 
 import logging
+import time
 import uuid
+from collections import defaultdict, deque
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
@@ -10,10 +13,14 @@ from fastapi.responses import JSONResponse
 from app.account.models import AuthSession, Parent
 from app.account.schemas import (
     ChildCreate,
+    ChildMe,
     ChildOut,
     ChildUpdate,
     Client,
     GoogleSignIn,
+    LinkCodeOut,
+    LinkIn,
+    Me,
     ParentMe,
     ParentOut,
     RefreshIn,
@@ -22,14 +29,19 @@ from app.account.schemas import (
 from app.account.service import (
     IDLE_LIMIT,
     ChildNotFound,
+    CodeNotValid,
     ConsentRequired,
     RefreshFailed,
     RefreshRace,
     SignInFailed,
+    TooManyLinkCodes,
     add_child,
+    create_link_code,
     end_session,
+    get_child,
     get_parent,
     list_children,
+    redeem_link_code,
     refresh_session,
     sign_in_with_google,
     start_session,
@@ -48,6 +60,38 @@ COOKIE_PATH = "/api/v1/auth"  # the browser sends it to /auth/* only
 CSRF_HEADER_VALUE = "mathbuddy"
 
 
+class FailureLimiter:
+    """Counts failures per key (here: client IP) in a sliding window, in memory.
+
+    Per server instance only. Enough for link codes: a code has ~40 bits and lives
+    10 minutes, so guessing is hopeless even across instances.
+    """
+
+    def __init__(self, limit: int, window_seconds: float):
+        self.limit = limit
+        self.window = window_seconds
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
+
+    def _prune(self, key: str) -> deque[float]:
+        hits = self._hits[key]
+        cutoff = time.monotonic() - self.window
+        while hits and hits[0] < cutoff:
+            hits.popleft()
+        return hits
+
+    def blocked(self, key: str) -> bool:
+        return len(self._prune(key)) >= self.limit
+
+    def record(self, key: str) -> None:
+        self._prune(key).append(time.monotonic())
+
+    def clear(self) -> None:
+        self._hits.clear()
+
+
+link_failures = FailureLimiter(limit=10, window_seconds=15 * 60)
+
+
 # --- Helpers ----------------------------------------------------------------------
 
 
@@ -59,27 +103,37 @@ async def _parent_me(session, parent: Parent) -> ParentMe:
     )
 
 
+async def _me_for_session(session, auth_session: AuthSession) -> ParentMe | ChildMe:
+    if auth_session.kind == "child":
+        child = await get_child(
+            session, auth_session.parent_id, auth_session.child_profile_id
+        )
+        return ChildMe(profile=ChildOut.model_validate(child))
+    parent = await get_parent(session, auth_session.parent_id)
+    return await _parent_me(session, parent)
+
+
 async def _signed_in(
     session,
     response: Response,
     auth_session: AuthSession,
-    parent: Parent,
     refresh_token: str,
     client: Client,
 ) -> SignedIn:
     """Access token in the body; refresh token in a cookie (web) or the body (native)."""
     settings = get_settings()
+    is_child = auth_session.kind == "child"
     access = issue_access_token(
         settings.jwt_secret,
-        sub=parent.id,
-        kind="parent",
-        pid=parent.id,
+        sub=auth_session.child_profile_id if is_child else auth_session.parent_id,
+        kind=auth_session.kind,
+        pid=auth_session.parent_id,
         sid=auth_session.id,
     )
     body = SignedIn(
         access_token=access,
         expires_in=int(ACCESS_TOKEN_TTL.total_seconds()),
-        me=await _parent_me(session, parent),
+        me=await _me_for_session(session, auth_session),
     )
     if client == "native":
         body.refresh_token = refresh_token
@@ -166,9 +220,7 @@ async def google_sign_in(
     auth_session, refresh_token = await start_session(
         session, parent, request.headers.get("user-agent")
     )
-    return await _signed_in(
-        session, response, auth_session, parent, refresh_token, data.client
-    )
+    return await _signed_in(session, response, auth_session, refresh_token, data.client)
 
 
 @router.post("/auth/refresh", response_model=SignedIn, response_model_exclude_none=True)
@@ -192,8 +244,11 @@ async def refresh(
         logger.warning("Refresh refused", extra={"reason": str(exc)})
         return _not_signed_in(client)
 
-    parent = await get_parent(session, auth_session.parent_id)
-    return await _signed_in(session, response, auth_session, parent, new_token, client)
+    try:
+        return await _signed_in(session, response, auth_session, new_token, client)
+    except ChildNotFound:
+        logger.warning("Refresh refused: child no longer belongs to the parent")
+        return _not_signed_in(client)
 
 
 @router.post("/auth/logout", status_code=204)
@@ -213,10 +268,38 @@ async def logout(
     return resp
 
 
-@router.get("/me", response_model=ParentMe)
+@router.post("/auth/link", response_model=SignedIn, response_model_exclude_none=True)
+async def link_device(
+    data: LinkIn, request: Request, response: Response, session: SessionDep
+):
+    """A child's device signs in with the one-time code the parent made."""
+    _require_configured()
+    ip = request.client.host if request.client else "unknown"
+    if link_failures.blocked(ip):
+        raise HTTPException(
+            status_code=429, detail="Too many tries. Wait a few minutes."
+        )
+    try:
+        auth_session, refresh_token = await redeem_link_code(
+            session, data.code, request.headers.get("user-agent"), data.device_name
+        )
+    except CodeNotValid as exc:
+        link_failures.record(ip)
+        logger.warning("Link code refused", extra={"reason": str(exc), "client": ip})
+        raise HTTPException(status_code=401, detail="Code not valid") from exc
+    return await _signed_in(session, response, auth_session, refresh_token, data.client)
+
+
+@router.get("/me", response_model=Me)
 async def who_am_i(claims: SignedInDep, session: SessionDep):
-    """The signed-in parent with their children. (A child's device: a later step.)"""
-    parent = await get_parent(session, claims.sub) if claims.kind == "parent" else None
+    """A parent with their children, or the child a linked device belongs to."""
+    if claims.kind == "child":
+        try:
+            child = await get_child(session, claims.pid, claims.sub)
+        except ChildNotFound as exc:
+            raise HTTPException(status_code=401, detail="Not signed in") from exc
+        return ChildMe(profile=ChildOut.model_validate(child))
+    parent = await get_parent(session, claims.sub)
     if parent is None:
         raise HTTPException(status_code=401, detail="Not signed in")
     return await _parent_me(session, parent)
@@ -243,3 +326,19 @@ async def change_child(
         return await update_child(session, claims.sub, child_id, data)
     except ChildNotFound as exc:
         raise HTTPException(status_code=404, detail="Child not found") from exc
+
+
+@router.post(
+    "/children/{child_id}/link-codes", response_model=LinkCodeOut, status_code=201
+)
+async def make_link_code(child_id: uuid.UUID, claims: ParentDep, session: SessionDep):
+    """A one-time code (10 minutes) for linking this child's device."""
+    try:
+        code, expires_at = await create_link_code(session, claims.sub, child_id)
+    except ChildNotFound as exc:
+        raise HTTPException(status_code=404, detail="Child not found") from exc
+    except TooManyLinkCodes as exc:
+        raise HTTPException(
+            status_code=429, detail="Too many codes. Try again later."
+        ) from exc
+    return LinkCodeOut(code=code, expires_at=expires_at)

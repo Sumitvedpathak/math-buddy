@@ -5,31 +5,13 @@ Web clients carry the refresh token in the `mb_refresh` cookie; native clients
 it is simpler to drive; the cookie form gets its own tests.
 """
 
-from datetime import timedelta
-
 import jwt
 import pytest
 
-from app.core.db import utcnow
 from tests.account.helpers import REFRESH_HEADERS, TERMS
 
 REFRESH = "/api/v1/auth/refresh"
 LOGOUT = "/api/v1/auth/logout"
-
-
-@pytest.fixture
-def clock(monkeypatch):
-    """Lets a test move the server's clock forward."""
-
-    class Clock:
-        now = utcnow()
-
-        def advance(self, **kwargs):
-            self.now += timedelta(**kwargs)
-
-    c = Clock()
-    monkeypatch.setattr("app.account.service.utcnow", lambda: c.now)
-    return c
 
 
 async def native_sign_in(client):

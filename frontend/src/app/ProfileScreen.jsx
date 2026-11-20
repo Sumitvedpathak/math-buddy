@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSession } from '../context/SessionContext'
+import LinkCodeForm from './LinkCodeForm'
 
 const GRADES = [
   { id: '6', title: 'Grade 6', subtitle: 'Junior Explorer' },
@@ -140,6 +141,14 @@ export default function ProfileScreen() {
           <span aria-hidden="true">→</span>
         </button>
       </form>
+
+      <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        or
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <LinkCodeForm />
 
       <p className="mt-6 text-center text-sm text-ink-soft">
         Parent?{' '}

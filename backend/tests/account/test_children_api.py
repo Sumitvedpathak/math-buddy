@@ -6,30 +6,9 @@ import pytest
 
 from app.account.tokens import issue_access_token
 from app.core.config import get_settings
-from tests.account.helpers import TERMS
+from tests.account.helpers import add_child, parent_headers
 
 CHILDREN = "/api/v1/children"
-
-
-async def parent_headers(client, id_token="token-ana"):
-    resp = await client.post(
-        "/api/v1/auth/google",
-        json={
-            "id_token": id_token,
-            "accepted_terms_version": TERMS,
-            "client": "native",
-        },
-    )
-    assert resp.status_code == 200
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
-
-
-async def add_child(client, headers, name="Aarav", grade="7"):
-    resp = await client.post(
-        CHILDREN, json={"display_name": name, "grade": grade}, headers=headers
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
 
 
 async def test_parent_adds_a_child(client):

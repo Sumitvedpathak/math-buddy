@@ -1,4 +1,4 @@
-"""Parent sign-in (Google) and signed-in device sessions (refresh, logout)."""
+"""Parent sign-in (Google), children, link codes, and device sessions."""
 
 import logging
 import uuid
@@ -9,12 +9,18 @@ from fastapi.concurrency import run_in_threadpool
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.account.models import AuthIdentity, AuthSession, Parent
+from app.account.models import AuthIdentity, AuthSession, LinkCode, Parent
 from app.account.schemas import ChildCreate, ChildUpdate
-from app.account.tokens import hash_refresh_token, new_refresh_token
+from app.account.tokens import (
+    hash_link_code,
+    hash_refresh_token,
+    new_link_code,
+    new_refresh_token,
+    normalize_link_code,
+)
 from app.core.db import utcnow
 from app.profiles.models import Profile
 
@@ -27,6 +33,8 @@ _google_request = google_requests.Request()  # fetches Google's public keys
 IDLE_LIMIT = {"parent": timedelta(days=60), "child": timedelta(days=180)}
 # Two tabs refreshing at the same moment both send the same token.
 RACE_WINDOW = timedelta(seconds=30)
+LINK_CODE_TTL = timedelta(minutes=10)
+LINK_CODES_PER_HOUR = 20  # per parent
 
 
 class SignInFailed(Exception):
@@ -43,6 +51,14 @@ class RefreshFailed(Exception):
 
 class ChildNotFound(Exception):
     """No such child, or it belongs to another parent (same answer for both)."""
+
+
+class TooManyLinkCodes(Exception):
+    """This parent made too many codes in the last hour."""
+
+
+class CodeNotValid(Exception):
+    """Unknown, used, cancelled or expired link code. The reason is logged only."""
 
 
 class RefreshRace(Exception):
@@ -132,23 +148,76 @@ def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+BROWSERS = [
+    ("Edg/", "Edge"),
+    ("OPR/", "Opera"),
+    ("Firefox/", "Firefox"),
+    ("Chrome/", "Chrome"),
+    ("Safari/", "Safari"),
+]
+SYSTEMS = [
+    ("Windows", "Windows"),
+    ("iPhone", "iPhone"),
+    ("iPad", "iPad"),
+    ("Android", "Android"),
+    ("CrOS", "Chromebook"),
+    ("Mac OS X", "Mac"),
+    ("Linux", "Linux"),
+]
+
+
+def friendly_device_name(user_agent: str | None) -> str:
+    """For example "Chrome on Windows". Good enough to tell devices apart in a list;
+    the parent can rename it later."""
+    ua = user_agent or ""
+    browser = next((name for key, name in BROWSERS if key in ua), None)
+    system = next((name for key, name in SYSTEMS if key in ua), None)
+    if browser and system:
+        return f"{browser} on {system}"
+    return browser or system or "Unknown device"
+
+
+async def _new_session(
+    session: AsyncSession,
+    *,
+    kind: str,
+    parent_id: uuid.UUID,
+    child_profile_id: uuid.UUID | None,
+    user_agent: str | None,
+    device_name: str | None,
+) -> tuple[AuthSession, str]:
+    """Add (not commit) a device session. Returns it with its first refresh token."""
+    now = utcnow()
+    token = new_refresh_token()
+    auth_session = AuthSession(
+        kind=kind,
+        parent_id=parent_id,
+        child_profile_id=child_profile_id,
+        refresh_hash=hash_refresh_token(token),
+        rotated_at=now,
+        device_name=device_name or friendly_device_name(user_agent),
+        user_agent=(user_agent or "")[:300] or None,
+        created_at=now,
+        last_used_at=now,
+        idle_expires_at=now + IDLE_LIMIT[kind],
+    )
+    session.add(auth_session)
+    await session.flush()  # assigns auth_session.id
+    return auth_session, token
+
+
 async def start_session(
     session: AsyncSession, parent: Parent, user_agent: str | None
 ) -> tuple[AuthSession, str]:
     """New parent session. Returns it with its first refresh token."""
-    now = utcnow()
-    token = new_refresh_token()
-    auth_session = AuthSession(
+    auth_session, token = await _new_session(
+        session,
         kind="parent",
         parent_id=parent.id,
-        refresh_hash=hash_refresh_token(token),
-        rotated_at=now,
-        user_agent=(user_agent or "")[:300] or None,
-        created_at=now,
-        last_used_at=now,
-        idle_expires_at=now + IDLE_LIMIT["parent"],
+        child_profile_id=None,
+        user_agent=user_agent,
+        device_name=None,
     )
-    session.add(auth_session)
     await session.commit()
     logger.info("Session started", extra={"session_id": str(auth_session.id)})
     return auth_session, token
@@ -244,12 +313,115 @@ async def add_child(
 async def update_child(
     session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID, data: ChildUpdate
 ) -> Profile:
-    child = await session.get(Profile, child_id)
-    if child is None or child.parent_id != parent_id:
-        raise ChildNotFound()
+    child = await get_child(session, parent_id, child_id)
     if data.display_name is not None:
         child.display_name = data.display_name
     if data.grade is not None:
         child.grade = data.grade
     await session.commit()
     return child
+
+
+async def get_child(
+    session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID
+) -> Profile:
+    """This parent's child, or ChildNotFound (also for another parent's child)."""
+    child = await session.get(Profile, child_id)
+    if child is None or child.parent_id != parent_id:
+        raise ChildNotFound()
+    return child
+
+
+# --- Link codes ---------------------------------------------------------------------
+
+
+async def create_link_code(
+    session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID
+) -> tuple[str, datetime]:
+    """A new one-time code for this child. Cancels the child's earlier unused codes."""
+    await get_child(session, parent_id, child_id)
+    now = utcnow()
+    made_last_hour = await session.scalar(
+        select(func.count())
+        .select_from(LinkCode)
+        .where(
+            LinkCode.parent_id == parent_id,
+            LinkCode.created_at > now - timedelta(hours=1),
+        )
+    )
+    if made_last_hour >= LINK_CODES_PER_HOUR:
+        raise TooManyLinkCodes()
+
+    earlier = await session.scalars(
+        select(LinkCode).where(
+            LinkCode.child_profile_id == child_id, LinkCode.used_at.is_(None)
+        )
+    )
+    for row in earlier:
+        if _aware(row.expires_at) > now:
+            row.expires_at = now  # cancelled
+
+    code = new_link_code()
+    expires_at = now + LINK_CODE_TTL
+    session.add(
+        LinkCode(
+            child_profile_id=child_id,
+            parent_id=parent_id,
+            code_hash=hash_link_code(normalize_link_code(code)),
+            expires_at=expires_at,
+            created_at=now,
+        )
+    )
+    await session.commit()
+    logger.info(
+        "Link code made",
+        extra={"parent_id": str(parent_id), "profile_id": str(child_id)},
+    )
+    return code, expires_at
+
+
+async def redeem_link_code(
+    session: AsyncSession,
+    typed_code: str,
+    user_agent: str | None,
+    device_name: str | None,
+) -> tuple[AuthSession, str]:
+    """Use a code once: start a child session on this device."""
+    normalized = normalize_link_code(typed_code)
+    if normalized is None:
+        raise CodeNotValid("not a code")
+    now = utcnow()
+    row = await session.scalar(
+        select(LinkCode).where(LinkCode.code_hash == hash_link_code(normalized))
+    )
+    if row is None:
+        raise CodeNotValid("unknown code")
+    if row.used_at is not None or _aware(row.expires_at) <= now:
+        raise CodeNotValid(f"code {row.id} used, cancelled or expired")
+    # Mark used only if still unused: two devices typing the same code at once
+    # cannot both win.
+    claimed = await session.execute(
+        update(LinkCode)
+        .where(LinkCode.id == row.id, LinkCode.used_at.is_(None))
+        .values(used_at=now)
+    )
+    if claimed.rowcount != 1:
+        raise CodeNotValid(f"code {row.id} already used")
+    child = await session.get(Profile, row.child_profile_id)
+    if child is None or child.parent_id != row.parent_id:
+        raise CodeNotValid(f"code {row.id}: child no longer belongs to its parent")
+
+    auth_session, token = await _new_session(
+        session,
+        kind="child",
+        parent_id=row.parent_id,
+        child_profile_id=child.id,
+        user_agent=user_agent,
+        device_name=device_name,
+    )
+    await session.commit()
+    logger.info(
+        "Device linked",
+        extra={"session_id": str(auth_session.id), "profile_id": str(child.id)},
+    )
+    return auth_session, token

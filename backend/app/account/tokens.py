@@ -84,3 +84,31 @@ def new_refresh_token() -> str:
 
 def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# --- Link codes (parent -> child device) -------------------------------------------
+
+# No look-alikes: no 0/O, no 1/I.
+LINK_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+LINK_CODE_LENGTH = 8
+
+
+def new_link_code() -> str:
+    """A one-time code shown to the parent, e.g. "7K4Q-9PXM" (40 bits)."""
+    raw = "".join(secrets.choice(LINK_CODE_ALPHABET) for _ in range(LINK_CODE_LENGTH))
+    return f"{raw[:4]}-{raw[4:]}"
+
+
+def normalize_link_code(typed: str) -> str | None:
+    """What the child typed -> the 8 code characters, or None if it cannot be a code.
+
+    Case-insensitive; spaces and dashes are ignored.
+    """
+    code = "".join(ch for ch in (typed or "").upper() if ch not in " -")
+    if len(code) != LINK_CODE_LENGTH or any(c not in LINK_CODE_ALPHABET for c in code):
+        return None
+    return code
+
+
+def hash_link_code(normalized: str) -> str:
+    return hashlib.sha256(normalized.encode()).hexdigest()

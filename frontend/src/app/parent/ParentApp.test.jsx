@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ParentApp, { isParentPath } from './ParentApp'
 import { ConsentRequiredError, refreshSession, signInWithGoogle, signOut } from '../../lib/auth'
-import { addChild, updateChild } from '../../lib/api'
+import { addChild, createLinkCode, updateChild } from '../../lib/api'
 
 vi.mock('../../lib/auth', async () => {
   const actual = await vi.importActual('../../lib/auth')
@@ -15,7 +15,7 @@ vi.mock('../../lib/auth', async () => {
   }
 })
 
-vi.mock('../../lib/api', () => ({ addChild: vi.fn(), updateChild: vi.fn() }))
+vi.mock('../../lib/api', () => ({ addChild: vi.fn(), updateChild: vi.fn(), createLinkCode: vi.fn() }))
 
 // Google's real button needs Google's script; this stand-in hands back a fake ID token.
 vi.mock('./GoogleButton', () => ({
@@ -172,5 +172,34 @@ describe('ParentApp children', () => {
     await userEvent.click(screen.getByRole('button', { name: /add child/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i)
+  })
+})
+
+
+describe('ParentApp link a device', () => {
+  it('shows a one-time code for the child with the time left', async () => {
+    refreshSession.mockResolvedValue({ ...ME, children: [AARAV] })
+    const inTenMinutes = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    createLinkCode.mockResolvedValue({ code: '7K4Q-9PXM', expiresAt: inTenMinutes })
+    render(<ParentApp />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /link a device for aarav/i }))
+
+    expect(createLinkCode).toHaveBeenCalledWith('c1')
+    const panel = await screen.findByRole('region', { name: /link code for aarav/i })
+    expect(within(panel).getByText('7K4Q-9PXM')).toBeInTheDocument()
+    expect(within(panel).getByText(/(10|9):\d\d/)).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: /done/i }))
+    expect(screen.queryByText('7K4Q-9PXM')).not.toBeInTheDocument()
+  })
+
+  it('says so when the code could not be made', async () => {
+    refreshSession.mockResolvedValue({ ...ME, children: [AARAV] })
+    createLinkCode.mockRejectedValue(Object.assign(new Error('Too many'), { status: 429 }))
+    render(<ParentApp />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /link a device for aarav/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/too many codes/i)
   })
 })

@@ -135,3 +135,15 @@ export async function authFetch(path, { method = 'GET', body } = {}) {
   if (!response.ok) throw await readError(response)
   return response.status === 204 ? null : response.json()
 }
+
+/**
+ * A child's device: swap the one-time code from the parent for a child session.
+ * Returns `me` ({ kind: 'child', profile }). Throws with `.status` (401 wrong code, 429 too many tries).
+ */
+export async function linkDevice(code) {
+  const response = await post('/auth/link', { code })
+  if (!response.ok) throw await readError(response)
+  const data = await response.json()
+  accessToken = data.access_token
+  return data.me
+}

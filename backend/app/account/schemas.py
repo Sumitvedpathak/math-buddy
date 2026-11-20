@@ -1,7 +1,8 @@
 import uuid
-from typing import Literal
+from datetime import datetime
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.profiles.schemas import DisplayName, Grade
 
@@ -56,8 +57,32 @@ class ParentMe(BaseModel):
     children: list[ChildOut]
 
 
+class ChildMe(BaseModel):
+    """A linked child device."""
+
+    kind: Literal["child"] = "child"
+    profile: ChildOut
+
+
+Me = Annotated[ParentMe | ChildMe, Field(discriminator="kind")]
+
+
+class LinkCodeOut(BaseModel):
+    code: str  # shown once, e.g. "7K4Q-9PXM"
+    expires_at: datetime
+
+
+class LinkIn(BaseModel):
+    code: str = Field(max_length=32)
+    client: Client = "web"
+    # Optional name the device gives itself; otherwise worked out from the browser.
+    device_name: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] | None
+    ) = None
+
+
 class SignedIn(BaseModel):
     access_token: str
     expires_in: int  # seconds
-    me: ParentMe
+    me: Me
     refresh_token: str | None = None  # native clients only

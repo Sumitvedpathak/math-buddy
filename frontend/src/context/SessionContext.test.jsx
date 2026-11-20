@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, act, waitFor } from '@testing-library/react'
 import { SessionProvider, useSession } from './SessionContext'
 import * as api from '../lib/api'
+import * as auth from '../lib/auth'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual('../lib/api')
@@ -16,6 +17,8 @@ vi.mock('../lib/api', async () => {
     saveAttemptWithRetry: vi.fn(),
   }
 })
+
+vi.mock('../lib/auth', () => ({ refreshSession: vi.fn(), linkDevice: vi.fn() }))
 
 const PROFILE = { id: 'p1', email: 'kid@example.com', displayName: 'Sam', grade: '7' }
 const CURRICULUM = [
@@ -54,6 +57,7 @@ beforeEach(() => {
   api.generateQuestions.mockResolvedValue({ questions: [QUESTION], fun_facts: ['fact'] })
   api.evaluateAnswers.mockResolvedValue(EVALUATION)
   api.saveAttemptWithRetry.mockResolvedValue(true)
+  auth.refreshSession.mockResolvedValue(null)
 })
 
 async function signIn() {
@@ -304,5 +308,44 @@ describe('curriculum session', () => {
       ['Variables in Expressions'], '11-12', 25, '10.3'
     )
     expect(ctx.state.screen).toBe('practice')
+  })
+})
+
+
+describe('linked child device', () => {
+  const CHILD_ME = { kind: 'child', profile: { id: 'c1', display_name: 'Aarav', grade: '7' } }
+  const CHILD = { id: 'c1', email: null, displayName: 'Aarav', grade: '7' }
+
+  it('goes straight into the child profile when this browser is linked', async () => {
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    mount()
+
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+    expect(ctx.state.profile).toEqual(CHILD)
+    expect(ctx.state.screen).toBe('home')
+    expect(ctx.state.ageGroup).toBe('11-12')
+    expect(api.lookupProfile).not.toHaveBeenCalled()
+    // Nothing about the sign-in is kept in localStorage.
+    expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
+  })
+
+  it('ignores a parent session in this browser', async () => {
+    auth.refreshSession.mockResolvedValue({ kind: 'parent', parent: {}, children: [] })
+    mount()
+
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
+    expect(ctx.state.screen).toBe('profile')
+  })
+
+  it('links this browser with a code and enters the child profile', async () => {
+    auth.linkDevice.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
+
+    await act(() => ctx.linkWithCode('7K4Q-9PXM'))
+
+    expect(auth.linkDevice).toHaveBeenCalledWith('7K4Q-9PXM')
+    expect(ctx.state.profile).toEqual(CHILD)
+    expect(ctx.state.screen).toBe('home')
   })
 })

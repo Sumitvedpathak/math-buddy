@@ -4,6 +4,7 @@ import {
   TERMS_VERSION,
   authFetch,
   getAccessToken,
+  linkDevice,
   refreshSession,
   resetAuthForTests,
   signInWithGoogle,
@@ -158,5 +159,26 @@ describe('signOut', () => {
     expect(url).toBe('/api/v1/auth/logout')
     expect(init.headers['X-Requested-With']).toBe('mathbuddy')
     expect(getAccessToken()).toBeNull()
+  })
+})
+
+
+describe('linkDevice', () => {
+  const CHILD_ME = { kind: 'child', profile: { id: 'c1', display_name: 'Aarav', grade: '7' } }
+
+  it('swaps the code for a child session on this browser', async () => {
+    fetch.mockResolvedValue(jsonResponse({ access_token: 'child-1', expires_in: 900, me: CHILD_ME }))
+
+    expect(await linkDevice('7k4q 9pxm')).toEqual(CHILD_ME)
+    expect(getAccessToken()).toBe('child-1')
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/auth/link')
+    expect(init.credentials).toBe('same-origin')
+    expect(JSON.parse(init.body)).toEqual({ code: '7k4q 9pxm' })
+  })
+
+  it('fails with the status for a wrong code', async () => {
+    fetch.mockResolvedValue(jsonResponse({ detail: 'Code not valid' }, 401))
+    await expect(linkDevice('nope')).rejects.toMatchObject({ status: 401 })
   })
 })

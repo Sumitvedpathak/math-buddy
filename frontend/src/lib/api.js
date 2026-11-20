@@ -88,13 +88,14 @@ async function getJson(url, headers = {}) {
 /**
  * @typedef {Object} Profile
  * @property {string} id
- * @property {string} email
+ * @property {string|null} email - null for a child added by a parent
  * @property {string} displayName
  * @property {"6"|"7"} grade
  */
 
-function toProfile(raw) {
-  return { id: raw.id, email: raw.email, displayName: raw.display_name, grade: raw.grade }
+/** Server profile -> app profile. Children added by a parent have no email. */
+export function toProfile(raw) {
+  return { id: raw.id, email: raw.email ?? null, displayName: raw.display_name, grade: raw.grade }
 }
 
 /**
@@ -269,4 +270,10 @@ export function updateChild(childId, { displayName, grade } = {}) {
   if (displayName !== undefined) body.display_name = displayName
   if (grade !== undefined) body.grade = grade
   return authFetch(`/children/${encodeURIComponent(childId)}`, { method: 'PATCH', body })
+}
+
+/** A one-time code (10 minutes) for linking a child's device: { code, expiresAt }. */
+export async function createLinkCode(childId) {
+  const data = await authFetch(`/children/${encodeURIComponent(childId)}/link-codes`, { method: 'POST' })
+  return { code: data.code, expiresAt: data.expires_at }
 }

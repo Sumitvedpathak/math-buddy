@@ -13,6 +13,7 @@ beforeEach(() => {
     findProfile: vi.fn(),
     registerProfile: vi.fn(),
     enterProfile: vi.fn(),
+    linkWithCode: vi.fn(),
   }
 })
 
@@ -100,5 +101,38 @@ describe('ProfileScreen', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/check your connection/i)
     expect(ctx.enterProfile).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('ProfileScreen link code', () => {
+  it('links this device with the code from a parent', async () => {
+    ctx.linkWithCode.mockResolvedValue(undefined)
+    const user = setup()
+
+    await user.type(screen.getByLabelText(/code from your parent/i), '7k4q-9pxm')
+    await user.click(screen.getByRole('button', { name: /use code/i }))
+
+    expect(ctx.linkWithCode).toHaveBeenCalledWith('7k4q-9pxm')
+  })
+
+  it('explains a code that did not work', async () => {
+    ctx.linkWithCode.mockRejectedValue(Object.assign(new Error('Code not valid'), { status: 401 }))
+    const user = setup()
+
+    await user.type(screen.getByLabelText(/code from your parent/i), 'ABCD-EFGH')
+    await user.click(screen.getByRole('button', { name: /use code/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ask your parent for a new one/i)
+  })
+
+  it('asks to wait after too many tries', async () => {
+    ctx.linkWithCode.mockRejectedValue(Object.assign(new Error('Too many'), { status: 429 }))
+    const user = setup()
+
+    await user.type(screen.getByLabelText(/code from your parent/i), 'ABCD-EFGH')
+    await user.click(screen.getByRole('button', { name: /use code/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/wait a few minutes/i)
   })
 })

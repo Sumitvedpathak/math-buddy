@@ -28,7 +28,8 @@ Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`
 - **Step 2 (done):** table `auth_sessions` (one row per signed-in device, migration `0004`). Sign-in also starts a session: web gets the refresh token in cookie `mb_refresh` (HttpOnly, Secure, SameSite=Strict, Path=/api/v1/auth), `client:"native"` gets it in the body. `POST /auth/refresh` rotates it (current/prev/older hashes: prev within 30 s = `409 refresh_race`, prev later = lost reply accepted, older = theft, session revoked); idle expiry 60 days (parent), pushed forward on every refresh. `POST /auth/logout` revokes, always 204. Cookie requests also need `X-Requested-With: mathbuddy` and an `Origin` in `CORS_ORIGINS` (else 403). Access tokens carry `sid`.
 - **Frontend for steps 1-2 (done):** page `/parent` (`src/app/parent/ParentApp.jsx`, its own route tree in `main.jsx` like `/admin`), linked from the profile screen. `GoogleButton.jsx` loads Google Identity Services directly (client ID from `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`). `src/lib/auth.js` owns tokens: access token in memory only, one shared refresh per tab (retries once on 409), `authFetch` refreshes and retries once on 401. Needs the Vite `/api` proxy (same origin) for the cookie; production needs the nginx proxy (deploy step).
 - **Step 3 (done, backend + `/parent` page):** `GET/POST /children`, `PATCH /children/{id}` (parent token only, `require_parent`/`ParentDep` in `core/deps.py`; a child token gets 403, another parent's child 404). A child is a `profiles` row with `parent_id` and **no email** (`profiles.email` now nullable, migration `0005`). `/me` and sign-in/refresh replies include `children: [{id, display_name, grade}]`. Frontend: `ChildrenSection.jsx` (list, add, edit), calls `addChild`/`updateChild` in `lib/api.js` via `authFetch`.
-- **Next:** 4 link codes, 4 link codes, 5 devices, 6 lock down existing endpoints (ships with the frontend).
+- **Step 4 (done, backend + web):** `POST /children/{id}/link-codes` (parent; 8 chars `XXXX-XXXX` from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, 10 min, single use, a new code cancels the child's earlier unused ones, 20 per parent per hour, only the hash stored in `link_codes`, migration `0006`). `POST /auth/link {code, client, device_name?}` (case/space/dash-insensitive; wrong code = `401 Code not valid`; 10 wrong per IP per 15 min = 429, in-memory `link_failures` in `account/router.py`) starts a child session (idle 180 days; device name from the user agent, e.g. "Chrome on Windows"). Child access token: `sub` = profile id, `pid` = parent. `/me` for a child = `{kind:"child", profile}`. Web: "Link a device" + code panel with countdown in `ChildrenSection.jsx`; kid side `LinkCodeForm.jsx` on the profile screen -> `linkWithCode` in SessionContext. On app start SessionContext calls `refreshSession()`: a child session enters that profile (nothing cached in localStorage; `writeCachedIdentity` skips profiles without email), otherwise the old email cache / profile screen. The old profile endpoints stay open until step 6.
+- **Next:** 5 devices, 4 link codes, 5 devices, 6 lock down existing endpoints (ships with the frontend).
 
 ## Writing Coach (temporary; grade 7 son only)
 
@@ -80,7 +81,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (203 tests)
+npm run test:run        # Single run (215 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -114,7 +115,7 @@ backend/app/
     deps.py            SessionDep, require_admin, require_signed_in (Bearer access token)
     llm.py             ALL LLM calls (call_llm, call_llm_with_usage, LLMServiceError)
     logging_config.py
-  account/           /auth/*, GET /me, /children  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity, AuthSession)
+  account/           /auth/*, GET /me, /children, link codes  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity, AuthSession, LinkCode)
   profiles/          GET /profiles/lookup, POST /profiles          (router, service, schemas, models: Profile)
   curriculum/        GET /curriculum                               (router, service, schemas, data/curriculum.json)
   practice/          POST /questions/generate, POST /answers/evaluate
@@ -235,12 +236,12 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 238 tests (233 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 271 tests (266 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 203 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
+- 215 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)

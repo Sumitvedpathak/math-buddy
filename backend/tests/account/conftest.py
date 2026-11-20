@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 import pytest
 
+from app.core.db import utcnow
 from tests.account.helpers import GOOGLE_CLAIMS
 
 
@@ -15,3 +18,18 @@ def fake_google(monkeypatch):
 
     monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", verify)
     return calls
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """Lets a test move the server's clock forward."""
+
+    class Clock:
+        now = utcnow()
+
+        def advance(self, **kwargs):
+            self.now += timedelta(**kwargs)
+
+    c = Clock()
+    monkeypatch.setattr("app.account.service.utcnow", lambda: c.now)
+    return c

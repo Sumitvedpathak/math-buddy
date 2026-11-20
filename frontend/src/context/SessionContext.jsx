@@ -8,8 +8,10 @@ import {
   fetchLessonStatus,
   buildAttemptPayload,
   saveAttemptWithRetry,
+  toProfile,
 } from '../lib/api'
 import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
+import { linkDevice, refreshSession } from '../lib/auth'
 
 /**
  * @typedef {import('../lib/api').Question} Question
@@ -62,6 +64,9 @@ function readCachedIdentity() {
 }
 
 function writeCachedIdentity(profile) {
+  // Only the old email sign-in is cached. A linked child device is recognised by its
+  // sign-in cookie instead, so nothing about it goes into localStorage.
+  if (!profile.email) return
   try {
     window.localStorage.setItem(
       PROFILE_STORAGE_KEY,
@@ -145,10 +150,11 @@ export function SessionProvider({ children }) {
     cachedIdentityRef.current = readCachedIdentity()
   }
 
+  // Always 'loading' first: the server is asked whether this browser is a linked child device.
   const [state, setState] = useState(() =>
     cachedIdentityRef.current
       ? { ...INITIAL_STATE, profileStatus: 'loading', screen: readWritingCoachOpen() ? 'writingCoach' : 'home' }
-      : { ...INITIAL_STATE, screen: 'profile' }
+      : { ...INITIAL_STATE, profileStatus: 'loading', screen: 'profile' }
   )
 
   useEffect(() => {
@@ -231,13 +237,33 @@ export function SessionProvider({ children }) {
     setState({ ...INITIAL_STATE, screen: 'profile' })
   }, [])
 
-  // Auto-resume the cached profile on the same browser.
+  /** A child's device: use the one-time code from a parent, then enter that child's profile. */
+  const linkWithCode = useCallback(async (code) => {
+    const me = await linkDevice(code)
+    await enterProfile(toProfile(me.profile))
+  }, [enterProfile])
+
+  // On start: a linked child device (refresh cookie) wins; otherwise resume the cached
+  // email profile; otherwise show the profile screen.
   useEffect(() => {
     const cached = cachedIdentityRef.current
-    if (!cached) return undefined
     let cancelled = false
 
     async function resume() {
+      const me = await refreshSession().catch(() => null)
+      if (cancelled) return
+      if (me?.kind === 'child') {
+        try {
+          await enterProfile(toProfile(me.profile), { keepScreen: Boolean(cached) })
+          return
+        } catch (err) {
+          console.error('[resumeLinkedChild] error:', err)
+        }
+      }
+      if (!cached) {
+        setState((s) => ({ ...s, profileStatus: 'none', screen: 'profile' }))
+        return
+      }
       try {
         const profile = await lookupProfile(cached.email)
         if (cancelled) return
@@ -428,6 +454,7 @@ export function SessionProvider({ children }) {
     findProfile,
     registerProfile,
     enterProfile,
+    linkWithCode,
     switchProfile,
   }
 

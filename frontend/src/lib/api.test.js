@@ -9,6 +9,8 @@ import {
   adminGet,
   addChild,
   updateChild,
+  createLinkCode,
+  toProfile,
 } from './api'
 
 function jsonResponse(body, status = 200) {
@@ -181,5 +183,25 @@ describe('children (parent only)', () => {
     expect(url).toBe('/api/v1/children/c1')
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(init.body)).toEqual({ display_name: 'Aaru' })
+  })
+})
+
+
+describe('createLinkCode', () => {
+  it('asks for a code for one child', async () => {
+    fetch.mockResolvedValue(jsonResponse({ code: '7K4Q-9PXM', expires_at: '2026-11-20T10:10:00Z' }, 201))
+
+    expect(await createLinkCode('c1')).toEqual({ code: '7K4Q-9PXM', expiresAt: '2026-11-20T10:10:00Z' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1/link-codes')
+    expect(init.method).toBe('POST')
+  })
+})
+
+describe('toProfile', () => {
+  it('handles a child added by a parent, who has no email', () => {
+    expect(toProfile({ id: 'c1', display_name: 'Aarav', grade: '7' })).toEqual({
+      id: 'c1', email: null, displayName: 'Aarav', grade: '7',
+    })
   })
 })

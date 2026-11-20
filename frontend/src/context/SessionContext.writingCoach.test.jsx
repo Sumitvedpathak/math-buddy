@@ -10,6 +10,8 @@ vi.mock('../lib/api', async (importOriginal) => ({
   fetchLessonStatus: vi.fn().mockResolvedValue({}),
 }))
 
+vi.mock('../lib/auth', () => ({ refreshSession: vi.fn().mockResolvedValue(null), linkDevice: vi.fn() }))
+
 const FLAG = 'mathBuddy.wc.open'
 
 function Probe() {
