@@ -148,12 +148,12 @@ auth_sessions                                -- one row per signed-in device
   refresh_hash      text   -- sha256 of current refresh token
   prev_refresh_hash text   -- sha256 of the one before (see rotation)
   rotated_at        timestamptz
-  current_used_at   timestamptz null  -- see rotation rules in §6
+  older_refresh_hash text  -- sha256 of the one before prev (theft detection, see §6)
   device_name       text
   user_agent        text
   created_at, last_used_at, idle_expires_at
   revoked_at        timestamptz null
-  index on refresh_hash, prev_refresh_hash
+  index on refresh_hash, prev_refresh_hash, older_refresh_hash
 
 link_codes
   id uuid pk
@@ -173,11 +173,11 @@ link_codes
 | Idle expiry (pushed forward on every refresh) | 60 days | 180 days |
 | Absolute expiry | none | none: lasts until unlinked |
 
-**Rotation with reuse detection:** every refresh issues a new refresh token. The old hash moves to `prev_refresh_hash`. The session also has `current_used_at` (null until the newest token has been presented once).
-- If the **current** token is presented: set `current_used_at`, rotate normally.
-- If the **previous** token is presented **within 30 seconds** of the rotation: this is two tabs refreshing at the same moment. Return `409 {"error":"refresh_race"}`. The client retries once; on the web the browser already holds the new cookie, so the retry succeeds.
-- If the **previous** token is presented after 30 seconds **and the newest token has never been used** (`current_used_at` is null): the reply to the last refresh was lost (lid closed, Wi-Fi dropped). Accept it and rotate again from it. *(Owner-approved intent: a linked laptop must not be signed out by a lost reply. Design call: this tolerance.)*
-- If the **previous** token is presented after the newest one **has** been used, or any older token is presented: treat it as theft. **Revoke the session** and return 401. The device must sign in or link again.
+**Rotation with reuse detection:** every refresh issues a new refresh token. The session keeps the hashes of the current token, the previous one (`prev`) and the one before that (`older`). *(Changed while building step 2: the first draft had a `current_used_at` column, but presenting the current token always rotates it, so that column could never tell the cases apart. A third hash does.)*
+- If the **current** token is presented: rotate normally (older ← prev ← current ← new).
+- If the **previous** token is presented **within 30 seconds** of the rotation: this is two tabs refreshing at the same moment. Return `409 {"detail":"refresh_race"}`. The client retries once; on the web the browser already holds the new cookie, so the retry succeeds.
+- If the **previous** token is presented after 30 seconds: the reply to the last refresh was lost (lid closed, Wi-Fi dropped), so the token in that lost reply was never used by this device. Accept, issue a new token, and keep the lost one as `older`. *(Owner-approved intent: a linked laptop must not be signed out by a lost reply.)*
+- If the **older** token is presented (already replaced twice, or the "lost" token turning up after all): treat it as theft. **Revoke the session** and return 401. The device must sign in or link again.
 - Revoked, idle-expired or unknown token: 401.
 
 **Web delivery:**

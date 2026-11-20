@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     jwt_secret: str | None = Field(default=None, validation_alias="math_buddy_jwt_secret")
     # Terms/privacy version a new parent must accept before their account is created.
     terms_version: str = Field(default="2026-11-draft", validation_alias="math_buddy_terms_version")
+    # The refresh cookie is Secure (HTTPS only). Browsers treat http://localhost as secure,
+    # so leave this on; turn it off only for a plain-http host that is not localhost.
+    cookie_secure: bool = Field(default=True, validation_alias="math_buddy_cookie_secure")
 
     # Logging
     # log_level: DEBUG | INFO | WARNING | ERROR | CRITICAL

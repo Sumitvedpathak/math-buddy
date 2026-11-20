@@ -7,55 +7,7 @@ Google would have returned for it.
 import pytest
 
 from app.core.config import get_settings
-
-TERMS = "2026-11-draft"
-
-GOOGLE_CLAIMS = {
-    "token-ana": {
-        "sub": "google-sub-ana",
-        "email": "ana@example.com",
-        "email_verified": True,
-        "name": "Ana Parent",
-    },
-    "token-ana-new-email": {
-        "sub": "google-sub-ana",
-        "email": "ana.new@example.com",
-        "email_verified": True,
-        "name": "Ana Parent",
-    },
-    "token-ben": {
-        "sub": "google-sub-ben",
-        "email": "ben@example.com",
-        "email_verified": True,
-    },
-    "token-unverified": {
-        "sub": "google-sub-eve",
-        "email": "eve@example.com",
-        "email_verified": False,
-        "name": "Eve",
-    },
-}
-
-
-@pytest.fixture(autouse=True)
-def fake_google(monkeypatch):
-    calls = []
-
-    def verify(token, request, audience):
-        calls.append(audience)
-        if token not in GOOGLE_CLAIMS:
-            raise ValueError("Token signature is invalid")
-        return GOOGLE_CLAIMS[token]
-
-    monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", verify)
-    return calls
-
-
-async def sign_in(client, id_token, terms=None):
-    body = {"id_token": id_token}
-    if terms is not None:
-        body["accepted_terms_version"] = terms
-    return await client.post("/api/v1/auth/google", json=body)
+from tests.account.helpers import TERMS, sign_in
 
 
 async def test_first_sign_in_needs_consent(client):

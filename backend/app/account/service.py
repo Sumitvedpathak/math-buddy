@@ -1,23 +1,30 @@
-"""Parent sign-in: check Google's ID token, then find or create the parent."""
+"""Parent sign-in (Google) and signed-in device sessions (refresh, logout)."""
 
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from fastapi.concurrency import run_in_threadpool
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.account.models import AuthIdentity, Parent
+from app.account.models import AuthIdentity, AuthSession, Parent
+from app.account.tokens import hash_refresh_token, new_refresh_token
 from app.core.db import utcnow
 
 logger = logging.getLogger(__name__)
 
 GOOGLE = "google"
 _google_request = google_requests.Request()  # fetches Google's public keys
+
+# A session ends after this long without a refresh; every refresh pushes it forward.
+IDLE_LIMIT = {"parent": timedelta(days=60), "child": timedelta(days=180)}
+# Two tabs refreshing at the same moment both send the same token.
+RACE_WINDOW = timedelta(seconds=30)
 
 
 class SignInFailed(Exception):
@@ -26,6 +33,14 @@ class SignInFailed(Exception):
 
 class ConsentRequired(Exception):
     """New parent who has not accepted the current terms yet."""
+
+
+class RefreshFailed(Exception):
+    """Unknown, revoked, expired or stolen refresh token. The reason is logged only."""
+
+
+class RefreshRace(Exception):
+    """The token was just rotated by another tab; retrying with the new one works."""
 
 
 @dataclass(frozen=True)
@@ -101,3 +116,94 @@ async def sign_in_with_google(
 
 async def get_parent(session: AsyncSession, parent_id: uuid.UUID) -> Parent | None:
     return await session.get(Parent, parent_id)
+
+
+# --- Sessions (one per signed-in device) ----------------------------------------
+
+
+def _aware(dt: datetime) -> datetime:
+    """SQLite hands back naive datetimes; treat them as UTC."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+async def start_session(
+    session: AsyncSession, parent: Parent, user_agent: str | None
+) -> tuple[AuthSession, str]:
+    """New parent session. Returns it with its first refresh token."""
+    now = utcnow()
+    token = new_refresh_token()
+    auth_session = AuthSession(
+        kind="parent",
+        parent_id=parent.id,
+        refresh_hash=hash_refresh_token(token),
+        rotated_at=now,
+        user_agent=(user_agent or "")[:300] or None,
+        created_at=now,
+        last_used_at=now,
+        idle_expires_at=now + IDLE_LIMIT["parent"],
+    )
+    session.add(auth_session)
+    await session.commit()
+    logger.info("Session started", extra={"session_id": str(auth_session.id)})
+    return auth_session, token
+
+
+async def _find_session(session: AsyncSession, token_hash: str) -> AuthSession | None:
+    return await session.scalar(
+        select(AuthSession)
+        .where(
+            or_(
+                AuthSession.refresh_hash == token_hash,
+                AuthSession.prev_refresh_hash == token_hash,
+                AuthSession.older_refresh_hash == token_hash,
+            )
+        )
+        .with_for_update()  # two refreshes of one session run one after the other
+    )
+
+
+async def refresh_session(session: AsyncSession, token: str) -> tuple[AuthSession, str]:
+    """Swap a refresh token for a new one (rotation with reuse detection)."""
+    now = utcnow()
+    token_hash = hash_refresh_token(token)
+    row = await _find_session(session, token_hash)
+    if row is None:
+        raise RefreshFailed("unknown refresh token")
+    if row.revoked_at is not None:
+        raise RefreshFailed("session revoked")
+    if _aware(row.idle_expires_at) <= now:
+        raise RefreshFailed("session idle-expired")
+
+    new_token = new_refresh_token()
+    new_hash = hash_refresh_token(new_token)
+    if token_hash == row.refresh_hash:
+        # Normal case: the newest token.
+        row.older_refresh_hash = row.prev_refresh_hash
+        row.prev_refresh_hash = row.refresh_hash
+    elif token_hash == row.prev_refresh_hash:
+        if now - _aware(row.rotated_at) < RACE_WINDOW:
+            raise RefreshRace()
+        # The reply to the last refresh was lost, so its token was never used by
+        # this device. Keep that token as `older`: if it ever shows up, it was stolen.
+        row.older_refresh_hash = row.refresh_hash
+    else:
+        # A token that has already been replaced twice: someone copied it.
+        row.revoked_at = now
+        await session.commit()
+        raise RefreshFailed(f"old refresh token reused, session {row.id} revoked")
+
+    row.refresh_hash = new_hash
+    row.rotated_at = now
+    row.last_used_at = now
+    row.idle_expires_at = now + IDLE_LIMIT[row.kind]
+    await session.commit()
+    return row, new_token
+
+
+async def end_session(session: AsyncSession, token: str) -> None:
+    """Sign this device out. Unknown or already-ended tokens are ignored."""
+    row = await _find_session(session, hash_refresh_token(token))
+    if row is not None and row.revoked_at is None:
+        row.revoked_at = utcnow()
+        await session.commit()
+        logger.info("Session ended", extra={"session_id": str(row.id)})
