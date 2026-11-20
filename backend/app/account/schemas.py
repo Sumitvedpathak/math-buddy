@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.profiles.schemas import DisplayName, Grade
+
 # "web": refresh token in an HttpOnly cookie. "native" (future apps): in the JSON body.
 Client = Literal["web", "native"]
 
@@ -28,9 +30,30 @@ class ParentOut(BaseModel):
     display_name: str
 
 
+class ChildCreate(BaseModel):
+    display_name: DisplayName
+    grade: Grade
+
+
+class ChildUpdate(BaseModel):
+    display_name: DisplayName | None = None
+    grade: Grade | None = None
+
+
+class ChildOut(BaseModel):
+    """All we keep about a child: a name and a grade."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    display_name: str
+    grade: Grade
+
+
 class ParentMe(BaseModel):
     kind: Literal["parent"] = "parent"
     parent: ParentOut
+    children: list[ChildOut]
 
 
 class SignedIn(BaseModel):

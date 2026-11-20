@@ -47,9 +47,9 @@ async def test_bad_token_beats_input_validation(client, admin_token):
 
 
 async def test_unconfigured_server_token_denies_everyone(client, monkeypatch, profile_id):
-    from types import SimpleNamespace
+    from app.core.config import get_settings
 
-    monkeypatch.setattr("app.core.deps.get_settings", lambda: SimpleNamespace(admin_token=None))
+    monkeypatch.setattr(get_settings(), "admin_token", None)
     for token in (None, "", "anything"):
         headers = {"X-Admin-Token": token} if token is not None else {}
         assert (await client.get("/api/v1/admin/profiles", headers=headers)).status_code == 404

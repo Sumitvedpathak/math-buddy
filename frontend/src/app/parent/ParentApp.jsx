@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ConsentRequiredError, refreshSession, signInWithGoogle, signOut } from '../../lib/auth'
 import { theme, setTheme } from '../../themes/dandysWorld'
+import ChildrenSection from './ChildrenSection'
 import GoogleButton from './GoogleButton'
 
 /** /parent is its own page (like /admin/<token>), separate from the child app for now. */
@@ -139,9 +140,7 @@ export default function ParentApp() {
               <p className="mt-1 font-display text-2xl font-semibold text-ink">{me.parent.display_name}</p>
               <p className="text-sm text-ink-soft">{me.parent.email}</p>
             </div>
-            <p className="text-sm text-ink-soft">
-              Adding your children and linking their devices comes next.
-            </p>
+            <ChildrenSection initialChildren={me.children ?? []} />
             <button
               type="button"
               disabled={busy}

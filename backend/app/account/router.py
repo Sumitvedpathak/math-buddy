@@ -1,6 +1,7 @@
-"""Account: sign-in, staying signed in, signing out, and "who am I"."""
+"""Account: sign-in, staying signed in, signing out, "who am I", and children."""
 
 import logging
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
@@ -8,6 +9,9 @@ from fastapi.responses import JSONResponse
 
 from app.account.models import AuthSession, Parent
 from app.account.schemas import (
+    ChildCreate,
+    ChildOut,
+    ChildUpdate,
     Client,
     GoogleSignIn,
     ParentMe,
@@ -17,20 +21,24 @@ from app.account.schemas import (
 )
 from app.account.service import (
     IDLE_LIMIT,
+    ChildNotFound,
     ConsentRequired,
     RefreshFailed,
     RefreshRace,
     SignInFailed,
+    add_child,
     end_session,
     get_parent,
+    list_children,
     refresh_session,
     sign_in_with_google,
     start_session,
+    update_child,
     verify_google_id_token,
 )
 from app.account.tokens import ACCESS_TOKEN_TTL, issue_access_token
 from app.core.config import get_settings
-from app.core.deps import SessionDep, SignedInDep
+from app.core.deps import ParentDep, SessionDep, SignedInDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["account"])
@@ -43,7 +51,16 @@ CSRF_HEADER_VALUE = "mathbuddy"
 # --- Helpers ----------------------------------------------------------------------
 
 
-def _signed_in(
+async def _parent_me(session, parent: Parent) -> ParentMe:
+    children = await list_children(session, parent.id)
+    return ParentMe(
+        parent=ParentOut.model_validate(parent),
+        children=[ChildOut.model_validate(c) for c in children],
+    )
+
+
+async def _signed_in(
+    session,
     response: Response,
     auth_session: AuthSession,
     parent: Parent,
@@ -62,7 +79,7 @@ def _signed_in(
     body = SignedIn(
         access_token=access,
         expires_in=int(ACCESS_TOKEN_TTL.total_seconds()),
-        me=ParentMe(parent=ParentOut.model_validate(parent)),
+        me=await _parent_me(session, parent),
     )
     if client == "native":
         body.refresh_token = refresh_token
@@ -149,7 +166,9 @@ async def google_sign_in(
     auth_session, refresh_token = await start_session(
         session, parent, request.headers.get("user-agent")
     )
-    return _signed_in(response, auth_session, parent, refresh_token, data.client)
+    return await _signed_in(
+        session, response, auth_session, parent, refresh_token, data.client
+    )
 
 
 @router.post("/auth/refresh", response_model=SignedIn, response_model_exclude_none=True)
@@ -174,7 +193,7 @@ async def refresh(
         return _not_signed_in(client)
 
     parent = await get_parent(session, auth_session.parent_id)
-    return _signed_in(response, auth_session, parent, new_token, client)
+    return await _signed_in(session, response, auth_session, parent, new_token, client)
 
 
 @router.post("/auth/logout", status_code=204)
@@ -196,8 +215,31 @@ async def logout(
 
 @router.get("/me", response_model=ParentMe)
 async def who_am_i(claims: SignedInDep, session: SessionDep):
-    """The signed-in parent. (Children are added in a later step.)"""
+    """The signed-in parent with their children. (A child's device: a later step.)"""
     parent = await get_parent(session, claims.sub) if claims.kind == "parent" else None
     if parent is None:
         raise HTTPException(status_code=401, detail="Not signed in")
-    return ParentMe(parent=ParentOut.model_validate(parent))
+    return await _parent_me(session, parent)
+
+
+@router.get("/children", response_model=list[ChildOut])
+async def get_children(claims: ParentDep, session: SessionDep):
+    """This parent's children, oldest first."""
+    return await list_children(session, claims.sub)
+
+
+@router.post("/children", response_model=ChildOut, status_code=201)
+async def create_child(data: ChildCreate, claims: ParentDep, session: SessionDep):
+    """Add a child: a name and a grade, nothing else."""
+    return await add_child(session, claims.sub, data)
+
+
+@router.patch("/children/{child_id}", response_model=ChildOut)
+async def change_child(
+    child_id: uuid.UUID, data: ChildUpdate, claims: ParentDep, session: SessionDep
+):
+    """Rename a child or change their grade. Another parent's child is a 404."""
+    try:
+        return await update_child(session, claims.sub, child_id, data)
+    except ChildNotFound as exc:
+        raise HTTPException(status_code=404, detail="Child not found") from exc

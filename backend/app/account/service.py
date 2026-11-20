@@ -13,8 +13,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.account.models import AuthIdentity, AuthSession, Parent
+from app.account.schemas import ChildCreate, ChildUpdate
 from app.account.tokens import hash_refresh_token, new_refresh_token
 from app.core.db import utcnow
+from app.profiles.models import Profile
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,10 @@ class ConsentRequired(Exception):
 
 class RefreshFailed(Exception):
     """Unknown, revoked, expired or stolen refresh token. The reason is logged only."""
+
+
+class ChildNotFound(Exception):
+    """No such child, or it belongs to another parent (same answer for both)."""
 
 
 class RefreshRace(Exception):
@@ -207,3 +213,43 @@ async def end_session(session: AsyncSession, token: str) -> None:
         row.revoked_at = utcnow()
         await session.commit()
         logger.info("Session ended", extra={"session_id": str(row.id)})
+
+
+# --- Children (profiles owned by a parent) -----------------------------------------
+
+
+async def list_children(session: AsyncSession, parent_id: uuid.UUID) -> list[Profile]:
+    rows = await session.scalars(
+        select(Profile)
+        .where(Profile.parent_id == parent_id)
+        .order_by(Profile.created_at, Profile.id)
+    )
+    return list(rows)
+
+
+async def add_child(
+    session: AsyncSession, parent_id: uuid.UUID, data: ChildCreate
+) -> Profile:
+    child = Profile(
+        parent_id=parent_id, display_name=data.display_name, grade=data.grade
+    )
+    session.add(child)
+    await session.commit()
+    logger.info(
+        "Child added", extra={"parent_id": str(parent_id), "profile_id": str(child.id)}
+    )
+    return child
+
+
+async def update_child(
+    session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID, data: ChildUpdate
+) -> Profile:
+    child = await session.get(Profile, child_id)
+    if child is None or child.parent_id != parent_id:
+        raise ChildNotFound()
+    if data.display_name is not None:
+        child.display_name = data.display_name
+    if data.grade is not None:
+        child.grade = data.grade
+    await session.commit()
+    return child

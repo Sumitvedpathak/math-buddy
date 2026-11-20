@@ -18,11 +18,14 @@ def normalize_email(value: str) -> str:
     return value
 
 
+DisplayName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+]
+
+
 class ProfileCreate(BaseModel):
     email: str
-    display_name: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
-    ]
+    display_name: DisplayName
     grade: Grade
 
     @field_validator("email")
@@ -35,7 +38,7 @@ class ProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: str
+    email: str | None
     display_name: str
     grade: Grade
     created_at: datetime

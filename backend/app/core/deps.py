@@ -36,6 +36,16 @@ def _not_signed_in() -> HTTPException:
 SignedInDep = Annotated[TokenClaims, Depends(require_signed_in)]
 
 
+async def require_parent(claims: SignedInDep) -> TokenClaims:
+    """A parent's access token. A child's token gets 403."""
+    if claims.kind != "parent":
+        raise HTTPException(status_code=403, detail="Parents only")
+    return claims
+
+
+ParentDep = Annotated[TokenClaims, Depends(require_parent)]
+
+
 async def require_admin(
     x_admin_token: Annotated[str | None, Header()] = None,
 ) -> None:

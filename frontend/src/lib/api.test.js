@@ -7,6 +7,8 @@ import {
   buildAttemptPayload,
   saveAttemptWithRetry,
   adminGet,
+  addChild,
+  updateChild,
 } from './api'
 
 function jsonResponse(body, status = 200) {
@@ -155,5 +157,29 @@ describe('adminGet', () => {
 
     fetch.mockResolvedValueOnce(jsonResponse({ detail: 'Not Found' }, 404))
     await expect(adminGet('bad', '/profiles')).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+
+describe('children (parent only)', () => {
+  it('adds a child with a name and a grade', async () => {
+    const child = { id: 'c1', display_name: 'Aarav', grade: '7' }
+    fetch.mockResolvedValue(jsonResponse(child, 201))
+
+    expect(await addChild({ displayName: 'Aarav', grade: '7' })).toEqual(child)
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ display_name: 'Aarav', grade: '7' })
+  })
+
+  it('changes only what is given', async () => {
+    fetch.mockResolvedValue(jsonResponse({ id: 'c1', display_name: 'Aaru', grade: '7' }))
+
+    await updateChild('c1', { displayName: 'Aaru' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ display_name: 'Aaru' })
   })
 })

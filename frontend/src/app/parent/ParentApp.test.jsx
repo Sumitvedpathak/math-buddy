@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ParentApp, { isParentPath } from './ParentApp'
 import { ConsentRequiredError, refreshSession, signInWithGoogle, signOut } from '../../lib/auth'
+import { addChild, updateChild } from '../../lib/api'
 
 vi.mock('../../lib/auth', async () => {
   const actual = await vi.importActual('../../lib/auth')
@@ -14,6 +15,8 @@ vi.mock('../../lib/auth', async () => {
   }
 })
 
+vi.mock('../../lib/api', () => ({ addChild: vi.fn(), updateChild: vi.fn() }))
+
 // Google's real button needs Google's script; this stand-in hands back a fake ID token.
 vi.mock('./GoogleButton', () => ({
   default: ({ onCredential }) => (
@@ -23,7 +26,12 @@ vi.mock('./GoogleButton', () => ({
   ),
 }))
 
-const ME = { kind: 'parent', parent: { id: 'p1', email: 'ana@example.com', display_name: 'Ana Parent' } }
+const ME = {
+  kind: 'parent',
+  parent: { id: 'p1', email: 'ana@example.com', display_name: 'Ana Parent' },
+  children: [],
+}
+const AARAV = { id: 'c1', display_name: 'Aarav', grade: '7' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -97,5 +105,72 @@ describe('ParentApp', () => {
 
     expect(signOut).toHaveBeenCalledTimes(1)
     expect(await screen.findByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+  })
+})
+
+
+describe('ParentApp children', () => {
+  it('says so when there are no children yet', async () => {
+    refreshSession.mockResolvedValue(ME)
+    render(<ParentApp />)
+    expect(await screen.findByText(/no children yet/i)).toBeInTheDocument()
+  })
+
+  it('lists the children with their grade', async () => {
+    refreshSession.mockResolvedValue({ ...ME, children: [AARAV] })
+    render(<ParentApp />)
+    const list = await screen.findByRole('list', { name: /your children/i })
+    expect(within(list).getByText('Aarav')).toBeInTheDocument()
+    expect(within(list).getByText(/grade 7/i)).toBeInTheDocument()
+  })
+
+  it('adds a child', async () => {
+    refreshSession.mockResolvedValue(ME)
+    addChild.mockResolvedValue({ id: 'c2', display_name: 'Mira', grade: '6' })
+    render(<ParentApp />)
+
+    await userEvent.type(await screen.findByLabelText(/child's name/i), 'Mira')
+    await userEvent.click(screen.getByRole('radio', { name: /grade 6/i }))
+    await userEvent.click(screen.getByRole('button', { name: /add child/i }))
+
+    expect(addChild).toHaveBeenCalledWith({ displayName: 'Mira', grade: '6' })
+    const list = await screen.findByRole('list', { name: /your children/i })
+    expect(within(list).getByText('Mira')).toBeInTheDocument()
+    expect(screen.getByLabelText(/child's name/i)).toHaveValue('')
+  })
+
+  it('does not add a child without a name', async () => {
+    refreshSession.mockResolvedValue(ME)
+    render(<ParentApp />)
+    expect(await screen.findByRole('button', { name: /add child/i })).toBeDisabled()
+  })
+
+  it('edits a child', async () => {
+    refreshSession.mockResolvedValue({ ...ME, children: [AARAV] })
+    updateChild.mockResolvedValue({ ...AARAV, display_name: 'Aaru', grade: '6' })
+    render(<ParentApp />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /edit aarav/i }))
+    const name = screen.getByLabelText(/name for aarav/i)
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Aaru')
+    await userEvent.selectOptions(screen.getByLabelText(/grade for aarav/i), '6')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(updateChild).toHaveBeenCalledWith('c1', { displayName: 'Aaru', grade: '6' })
+    const list = await screen.findByRole('list', { name: /your children/i })
+    expect(within(list).getByText('Aaru')).toBeInTheDocument()
+    expect(within(list).getByText(/grade 6/i)).toBeInTheDocument()
+  })
+
+  it('shows a message when adding fails', async () => {
+    refreshSession.mockResolvedValue(ME)
+    addChild.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }))
+    render(<ParentApp />)
+
+    await userEvent.type(await screen.findByLabelText(/child's name/i), 'Mira')
+    await userEvent.click(screen.getByRole('button', { name: /add child/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i)
   })
 })

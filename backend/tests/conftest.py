@@ -19,9 +19,8 @@ async def client():
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlalchemy.pool import StaticPool
 
-    from app.core.db import get_session
+    from app.core.db import Base, get_session
     from app.main import app
-    from app.core.db import Base
 
     engine = create_async_engine(
         "sqlite+aiosqlite://",
@@ -46,9 +45,7 @@ async def client():
 @pytest.fixture
 def admin_token(monkeypatch):
     """Configure the server-side admin token and return it."""
-    from types import SimpleNamespace
+    from app.core.config import get_settings
 
-    monkeypatch.setattr(
-        "app.core.deps.get_settings", lambda: SimpleNamespace(admin_token=ADMIN_TOKEN)
-    )
+    monkeypatch.setattr(get_settings(), "admin_token", ADMIN_TOKEN)
     return ADMIN_TOKEN

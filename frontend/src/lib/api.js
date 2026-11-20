@@ -22,6 +22,8 @@
  * @property {Record<string, {score: number, maxScore: number, questionCount: number}>} topicBreakdown
  */
 
+import { authFetch } from './auth'
+
 const BASE_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1` 
   : '/api/v1'
@@ -252,4 +254,19 @@ export async function evaluateAnswers(questions, answers) {
       ])
     ),
   }
+}
+
+// --- Parent area (signed-in parent; the access token comes from lib/auth.js) -------
+
+/** Add a child: a name and a grade ('6' | '7'). */
+export function addChild({ displayName, grade }) {
+  return authFetch('/children', { method: 'POST', body: { display_name: displayName, grade } })
+}
+
+/** Rename a child and/or change their grade. Only the fields given are sent. */
+export function updateChild(childId, { displayName, grade } = {}) {
+  const body = {}
+  if (displayName !== undefined) body.display_name = displayName
+  if (grade !== undefined) body.grade = grade
+  return authFetch(`/children/${encodeURIComponent(childId)}`, { method: 'PATCH', body })
 }
