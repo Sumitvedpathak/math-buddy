@@ -141,6 +141,11 @@ export default function ProfileScreen() {
         </button>
       </form>
 
+      <p className="mt-6 text-center text-sm text-ink-soft">
+        Parent?{' '}
+        <a href="/parent" className="underline hover:text-ink">Sign in with Google</a>
+      </p>
+
       {confirmCreate && (
         <div
           role="dialog"

@@ -26,6 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`. Built one step at a time in `backend/app/account/`.
 - **Step 1 (done):** `POST /auth/google {id_token, accepted_terms_version?}` checks the Google ID token (`google-auth`, audience = `MATH_BUDDY_GOOGLE_CLIENT_IDS`, `email_verified` required), finds the parent by Google `sub` or creates one (first time needs `accepted_terms_version` = `MATH_BUDDY_TERMS_VERSION`, else `409 consent_required`), and returns a 15-minute JWT (`MATH_BUDDY_JWT_SECRET`). `GET /me` with `Authorization: Bearer`. Tables `parents`, `auth_identities` (migration `0003`). Tests fake `google.oauth2.id_token.verify_oauth2_token`.
 - **Step 2 (done):** table `auth_sessions` (one row per signed-in device, migration `0004`). Sign-in also starts a session: web gets the refresh token in cookie `mb_refresh` (HttpOnly, Secure, SameSite=Strict, Path=/api/v1/auth), `client:"native"` gets it in the body. `POST /auth/refresh` rotates it (current/prev/older hashes: prev within 30 s = `409 refresh_race`, prev later = lost reply accepted, older = theft, session revoked); idle expiry 60 days (parent), pushed forward on every refresh. `POST /auth/logout` revokes, always 204. Cookie requests also need `X-Requested-With: mathbuddy` and an `Origin` in `CORS_ORIGINS` (else 403). Access tokens carry `sid`.
+- **Frontend for steps 1-2 (done):** page `/parent` (`src/app/parent/ParentApp.jsx`, its own route tree in `main.jsx` like `/admin`), linked from the profile screen. `GoogleButton.jsx` loads Google Identity Services directly (client ID from `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`). `src/lib/auth.js` owns tokens: access token in memory only, one shared refresh per tab (retries once on 409), `authFetch` refreshes and retries once on 401. Needs the Vite `/api` proxy (same origin) for the cookie; production needs the nginx proxy (deploy step).
 - **Next:** 3 children, 4 link codes, 5 devices, 6 lock down existing endpoints (ships with the frontend).
 
 ## Writing Coach (temporary; grade 7 son only)
@@ -78,7 +79,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (176 tests)
+npm run test:run        # Single run (195 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -238,7 +239,7 @@ LOG_FORMAT=json                     # For Cloud Logging
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 176 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
+- 195 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)
