@@ -314,6 +314,18 @@ function LinkCodePanel({ childName, code, expiresAt, onCancel, onClose, onNewCod
     return () => clearInterval(timer)
   }, [expiresAt])
 
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('[copy link code] error:', err) // the code is still on screen to type
+    }
+  }
+
   const minutes = Math.floor(left / 60)
   const seconds = String(left % 60).padStart(2, '0')
 
@@ -341,9 +353,14 @@ function LinkCodePanel({ childName, code, expiresAt, onCancel, onClose, onNewCod
       )}
       <div className="flex gap-2">
         {left > 0 ? (
-          <button type="button" onClick={onCancel} className={quietButton}>
-            Cancel code
-          </button>
+          <>
+            <button type="button" onClick={copy} className={primaryButton}>
+              {copied ? 'Copied' : 'Copy code'}
+            </button>
+            <button type="button" onClick={onCancel} className={quietButton}>
+              Cancel code
+            </button>
+          </>
         ) : (
           <>
             <button type="button" onClick={onNewCode} className={primaryButton}>

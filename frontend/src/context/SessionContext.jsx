@@ -1,9 +1,7 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import {
   generateQuestions,
   evaluateAnswers,
-  lookupProfile,
-  createProfile,
   fetchCurriculum,
   fetchLessonStatus,
   buildAttemptPayload,
@@ -35,7 +33,7 @@ import { linkDevice, refreshSession } from '../lib/auth'
  * @property {Record<string, Answer>} answers
  * @property {EvaluationResult|null} evaluationResult
  * @property {{message: string, retryFn: () => void}|null} error
- * @property {Profile|null} profile - the loaded child profile (identity only is cached in localStorage)
+ * @property {Profile|null} profile - the signed-in child (from the server; nothing is kept in localStorage)
  * @property {"none"|"loading"|"ready"} profileStatus
  * @property {AppScreen|null} pendingScreen - where to go once a profile has been loaded
  * @property {Array} curriculum - units for the profile's grade (empty for grade 6)
@@ -51,37 +49,14 @@ export const CURRICULUM_QUESTION_COUNT = 25
 /** profiles.grade maps 1:1 onto the existing question-generation age groups. */
 const GRADE_TO_AGE_GROUP = { 6: '9-10', 7: '11-12' }
 
-const PROFILE_STORAGE_KEY = 'mathBuddy.profile'
+/** The old email sign-in kept { profileId, email } here. It is no longer used. */
+const OLD_PROFILE_STORAGE_KEY = 'mathBuddy.profile'
 
-/** Identity only ({ profileId, email }) — never progress data. */
-function readCachedIdentity() {
+function forgetOldEmailSignIn() {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PROFILE_STORAGE_KEY))
-    return parsed?.profileId && parsed?.email ? parsed : null
+    window.localStorage.removeItem(OLD_PROFILE_STORAGE_KEY)
   } catch {
-    return null
-  }
-}
-
-function writeCachedIdentity(profile) {
-  // Only the old email sign-in is cached. A linked child device is recognised by its
-  // sign-in cookie instead, so nothing about it goes into localStorage.
-  if (!profile.email) return
-  try {
-    window.localStorage.setItem(
-      PROFILE_STORAGE_KEY,
-      JSON.stringify({ profileId: profile.id, email: profile.email })
-    )
-  } catch {
-    // storage unavailable (private window etc.) — the app still works, just re-asks next visit
-  }
-}
-
-function clearCachedIdentity() {
-  try {
-    window.localStorage.removeItem(PROFILE_STORAGE_KEY)
-  } catch {
-    // ignore
+    // storage unavailable: nothing to forget
   }
 }
 
@@ -145,17 +120,13 @@ function carryOver(s) {
  * @param {{ children: React.ReactNode }} props
  */
 export function SessionProvider({ children }) {
-  const cachedIdentityRef = useRef(undefined)
-  if (cachedIdentityRef.current === undefined) {
-    cachedIdentityRef.current = readCachedIdentity()
-  }
-
-  // Always 'loading' first: the server is asked whether this browser is a linked child device.
-  const [state, setState] = useState(() =>
-    cachedIdentityRef.current
-      ? { ...INITIAL_STATE, profileStatus: 'loading', screen: readWritingCoachOpen() ? 'writingCoach' : 'home' }
-      : { ...INITIAL_STATE, profileStatus: 'loading', screen: 'profile' }
-  )
+  // 'loading' first: the server is asked whether this browser is a linked child device.
+  // The screen is where a reload should land if it is (home, or Writing Coach if open).
+  const [state, setState] = useState(() => ({
+    ...INITIAL_STATE,
+    profileStatus: 'loading',
+    screen: readWritingCoachOpen() ? 'writingCoach' : 'home',
+  }))
 
   useEffect(() => {
     writeWritingCoachOpen(state.screen === 'writingCoach')
@@ -190,15 +161,9 @@ export function SessionProvider({ children }) {
 
   /* ── Profiles ── */
 
-  /** Read-only existence check. Resolves to a Profile or null; never creates. */
-  const findProfile = useCallback((email) => lookupProfile(email), [])
-
-  /** Create a profile — callers must only do this after explicit user confirmation. */
-  const registerProfile = useCallback((input) => createProfile(input), [])
-
-  const refreshLessonStatus = useCallback(async (profileId) => {
+  const refreshLessonStatus = useCallback(async () => {
     try {
-      const lessonStatus = await fetchLessonStatus(profileId)
+      const lessonStatus = await fetchLessonStatus()
       setState((s) => ({ ...s, lessonStatus }))
     } catch (err) {
       console.warn('[refreshLessonStatus] failed', err)
@@ -206,18 +171,17 @@ export function SessionProvider({ children }) {
   }, [])
 
   /**
-   * Make `profile` the active one: load its curriculum + lesson status, cache its
-   * identity, and set the age group from its grade. Throws if the curriculum can't load.
+   * Make `profile` (the signed-in child) the active one: load its curriculum + lesson
+   * status and set the age group from its grade. Throws if the curriculum can't load.
    */
   const enterProfile = useCallback(async (profile, { keepScreen = false } = {}) => {
     const [curriculum, lessonStatus] = await Promise.all([
       fetchCurriculum(profile.grade),
-      fetchLessonStatus(profile.id).catch((err) => {
+      fetchLessonStatus().catch((err) => {
         console.warn('[enterProfile] lesson status unavailable', err)
         return {}
       }),
     ])
-    writeCachedIdentity(profile)
     setState((s) => ({
       ...s,
       profile,
@@ -231,59 +195,37 @@ export function SessionProvider({ children }) {
     }))
   }, [])
 
-  /** Forget the active profile (e.g. a sibling using the same device). */
-  const switchProfile = useCallback(() => {
-    clearCachedIdentity()
-    setState({ ...INITIAL_STATE, screen: 'profile' })
-  }, [])
-
   /** A child's device: use the one-time code from a parent, then enter that child's profile. */
   const linkWithCode = useCallback(async (code) => {
     const me = await linkDevice(code)
     await enterProfile(toProfile(me.profile))
   }, [enterProfile])
 
-  // On start: a linked child device (refresh cookie) wins; otherwise resume the cached
-  // email profile; otherwise show the profile screen.
+  // On start: ask the server whether this browser is a linked child device (refresh
+  // cookie). Yes: enter that child. No (or a parent's sign-in): the profile screen.
   useEffect(() => {
-    const cached = cachedIdentityRef.current
     let cancelled = false
+    forgetOldEmailSignIn()
 
     async function resume() {
       const me = await refreshSession().catch(() => null)
       if (cancelled) return
-      if (me?.kind === 'child') {
-        try {
-          await enterProfile(toProfile(me.profile), { keepScreen: Boolean(cached) })
-          return
-        } catch (err) {
-          console.error('[resumeLinkedChild] error:', err)
-        }
-      }
-      if (!cached) {
+      if (me?.kind !== 'child') {
         setState((s) => ({ ...s, profileStatus: 'none', screen: 'profile' }))
         return
       }
       try {
-        const profile = await lookupProfile(cached.email)
-        if (cancelled) return
-        if (!profile) {
-          clearCachedIdentity()
-          setState((s) => ({ ...s, profileStatus: 'none', screen: 'profile' }))
-          return
-        }
-        await enterProfile(profile, { keepScreen: true })
+        await enterProfile(toProfile(me.profile), { keepScreen: true })
       } catch (err) {
         if (cancelled) return
-        console.error('[resumeProfile] error:', err)
+        console.error('[resumeLinkedChild] error:', err)
         setState((s) => ({
           ...s,
           profileStatus: 'none',
-          screen: 'profile',
           error: {
             message: 'Could not load your profile. Please check your connection and try again.',
             retryFn: () => {
-              setState((cur) => ({ ...cur, error: null, profileStatus: 'loading', screen: 'home' }))
+              setState((cur) => ({ ...cur, error: null, profileStatus: 'loading' }))
               resume()
             },
           },
@@ -378,7 +320,6 @@ export function SessionProvider({ children }) {
   const persistAttempt = useCallback(async (result) => {
     if (!state.profile) return
     const payload = buildAttemptPayload({
-      profileId: state.profile.id,
       lessonId: state.lessonId,
       topicId: [...state.selectedTopics].sort().join('+') || 'adhoc',
       questions: state.questions,
@@ -387,7 +328,7 @@ export function SessionProvider({ children }) {
     setState((s) => ({ ...s, saveStatus: 'saving' }))
     const saved = await saveAttemptWithRetry(payload)
     setState((s) => ({ ...s, saveStatus: saved ? 'saved' : 'failed' }))
-    if (saved) refreshLessonStatus(state.profile.id)
+    if (saved) refreshLessonStatus()
   }, [state.profile, state.lessonId, state.selectedTopics, state.questions, refreshLessonStatus])
 
   const submitAnswers = useCallback(async (exportedAnswers) => {
@@ -451,11 +392,8 @@ export function SessionProvider({ children }) {
     resetSession,
     goHome,
     navigateTo,
-    findProfile,
-    registerProfile,
     enterProfile,
     linkWithCode,
-    switchProfile,
   }
 
   return (

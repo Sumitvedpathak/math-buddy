@@ -8,9 +8,11 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
+from tests.kids import CHILD
+
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers=CHILD())  # practice needs a signed-in child
 
 
 MOCK_QUESTIONS_RESPONSE = {

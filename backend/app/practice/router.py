@@ -2,8 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.deps import require_child
 from app.core.llm import LLMServiceError
 from app.curriculum.service import UnknownLessonError
 from app.practice.evaluation_service import evaluate_answers
@@ -16,7 +17,8 @@ from app.practice.schemas import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["practice"])
+# Only a signed-in child practises; nobody else can spend model calls.
+router = APIRouter(tags=["practice"], dependencies=[Depends(require_child)])
 
 
 @router.post("/questions/generate", response_model=GenerateQuestionsResponse)

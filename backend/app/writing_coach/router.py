@@ -1,7 +1,7 @@
 """Writing Coach routes, all under /api/v1/wc.
 
-Student routes identify the child with the X-Profile-Id header (the profile the app already
-holds) and require a grade 7 profile. Parent routes reuse the admin token.
+Student routes need a signed-in child (the child comes from the access token) in grade 7.
+Parent routes reuse the admin token.
 """
 
 import logging
@@ -9,11 +9,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import SessionDep, require_admin
+from app.core.deps import ChildProfileDep, SessionDep, require_admin
 from app.core.llm import LLMServiceError
 from app.profiles.models import Profile
 from app.writing_coach import agents
@@ -58,17 +58,7 @@ FOCUS_WEEKS = {
 
 # ------------------------------------------------------------------ helpers
 
-async def current_profile(
-    session: SessionDep,
-    x_profile_id: Annotated[str | None, Header()] = None,
-) -> Profile:
-    try:
-        profile_id = uuid.UUID(x_profile_id or "")
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Profile not found") from exc
-    profile = await session.get(Profile, profile_id)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Profile not found")
+async def current_profile(profile: ChildProfileDep) -> Profile:
     if profile.grade != "7":
         raise HTTPException(status_code=403, detail="Writing Coach is for grade 7.")
     return profile

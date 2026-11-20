@@ -1,15 +1,38 @@
 /**
- * API client for the Writing Coach. Every call goes to /api/v1/wc/... and carries the
- * profile id the app already holds. Self-contained so the feature can be removed cleanly.
+ * API client for the Writing Coach, under /api/v1/wc/.... The child's calls use the
+ * sign-in (lib/auth.js); the parent's calls on the admin page use the admin token.
+ * Self-contained so the feature can be removed cleanly.
  */
+
+import { authFetch } from '../lib/auth'
 
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1/wc`
   : '/api/v1/wc'
 
-async function request(method, path, { profileId, adminToken, body } = {}) {
+/** The message to show: the server's own, the first validation message, or a generic one. */
+function friendlyError(status, detail) {
+  let message = `Something went wrong (${status}). Please try again.`
+  if (typeof detail === 'string' && detail) message = detail
+  else if (Array.isArray(detail) && detail[0]?.msg) message = detail[0].msg
+  const err = new Error(message)
+  err.status = status
+  return err
+}
+
+/** A call by the signed-in child. */
+async function asChild(method, path, body) {
+  try {
+    return await authFetch(`/wc${path}`, { method, body })
+  } catch (err) {
+    if (err?.status === undefined) throw err // network error: keep it as it is
+    throw friendlyError(err.status, err.detail)
+  }
+}
+
+/** A call from the admin page. */
+async function request(method, path, { adminToken, body } = {}) {
   const headers = {}
-  if (profileId) headers['X-Profile-Id'] = profileId
   if (adminToken) headers['X-Admin-Token'] = adminToken
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -18,36 +41,35 @@ async function request(method, path, { profileId, adminToken, body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) {
-    let message = `Something went wrong (${response.status}). Please try again.`
+    let detail = null
     try {
-      const { detail } = await response.json()
-      if (typeof detail === 'string' && detail) message = detail
-      else if (Array.isArray(detail) && detail[0]?.msg) message = detail[0].msg
+      detail = (await response.json())?.detail ?? null
     } catch {
       // not JSON — keep the generic message
     }
-    const err = new Error(message)
-    err.status = response.status
-    throw err
+    throw friendlyError(response.status, detail)
   }
   return response.json()
 }
 
+/*
+ * The child's calls. A profile id passed in (`_profileId`) is no longer sent: the server
+ * takes the child from the sign-in. It stays so the screens, which re-load when the
+ * profile changes, did not all have to change for the sign-in work.
+ */
 export const wc = {
-  reminder: (profileId) => request('GET', '/reminder', { profileId }),
-  createSession: (profileId, body) => request('POST', '/sessions', { profileId, body }),
-  listSessions: (profileId) => request('GET', '/sessions', { profileId }),
-  getSession: (profileId, id) => request('GET', `/sessions/${id}`, { profileId }),
-  report: (profileId, id) => request('GET', `/sessions/${id}/report`, { profileId }),
-  decode: (profileId, id, body) => request('POST', `/sessions/${id}/decode`, { profileId, body }),
-  read: (profileId, id, kind, images) =>
-    request('POST', `/sessions/${id}/read`, { profileId, body: { kind, images } }),
-  confirm: (profileId, submissionId, text) =>
-    request('PUT', `/submissions/${submissionId}/transcript`, { profileId, body: { text } }),
-  review: (profileId, submissionId) =>
-    request('POST', `/submissions/${submissionId}/review`, { profileId }),
-  modelAnswer: (profileId, id) => request('POST', `/sessions/${id}/model-answer`, { profileId }),
-  overview: (profileId) => request('GET', '/overview', { profileId }),
+  reminder: () => asChild('GET', '/reminder'),
+  createSession: (_profileId, body) => asChild('POST', '/sessions', body),
+  listSessions: () => asChild('GET', '/sessions'),
+  getSession: (_profileId, id) => asChild('GET', `/sessions/${id}`),
+  report: (_profileId, id) => asChild('GET', `/sessions/${id}/report`),
+  decode: (_profileId, id, body) => asChild('POST', `/sessions/${id}/decode`, body),
+  read: (_profileId, id, kind, images) => asChild('POST', `/sessions/${id}/read`, { kind, images }),
+  confirm: (_profileId, submissionId, text) =>
+    asChild('PUT', `/submissions/${submissionId}/transcript`, { text }),
+  review: (_profileId, submissionId) => asChild('POST', `/submissions/${submissionId}/review`),
+  modelAnswer: (_profileId, id) => asChild('POST', `/sessions/${id}/model-answer`),
+  overview: () => asChild('GET', '/overview'),
 }
 
 /** Parent (admin token) calls, used by the Writing Coach tab on the admin page. */

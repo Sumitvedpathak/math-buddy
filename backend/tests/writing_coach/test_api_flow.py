@@ -2,6 +2,7 @@ import pytest
 
 from app.core.llm import LLMServiceError
 from tests.conftest import ADMIN_TOKEN
+from tests.kids import make_kid, token_headers
 
 from .samples import GOOD_ITEM, GOOD_REVIEW, MODEL_REPLY
 
@@ -30,9 +31,9 @@ def llm(monkeypatch):
 
 
 async def make_profile(client, grade="7", email="kid@example.com"):
-    r = await client.post("/api/v1/profiles", json={"email": email, "display_name": "Kid", "grade": grade})
-    assert r.status_code == 201
-    return {"X-Profile-Id": r.json()["id"]}, r.json()["id"]
+    """A linked child; `email` only tells different test children (and parents) apart."""
+    kid = await make_kid(client, grade=grade, parent=email)
+    return kid.headers, kid.id
 
 
 async def start_session(client, h, subject="history", **extra):
@@ -41,10 +42,19 @@ async def start_session(client, h, subject="history", **extra):
     return r.json()
 
 
-async def test_requires_a_grade_7_profile(client):
-    assert (await client.get("/api/v1/wc/reminder")).status_code == 404
+async def test_requires_a_grade_7_child(client):
+    assert (await client.get("/api/v1/wc/reminder")).status_code == 401
     h6, _ = await make_profile(client, grade="6", email="six@example.com")
     assert (await client.get("/api/v1/wc/reminder", headers=h6)).status_code == 403
+
+
+async def test_child_comes_from_the_token_not_a_header(client):
+    h7, pid = await make_profile(client)
+    # The old header alone no longer gets anyone in.
+    assert (await client.get("/api/v1/wc/reminder", headers={"X-Profile-Id": pid})).status_code == 401
+    parent = token_headers(kind="parent")
+    assert (await client.get("/api/v1/wc/reminder", headers=parent)).status_code == 403
+    assert (await client.get("/api/v1/wc/reminder", headers=h7)).status_code == 200
 
 
 async def test_reminder_defaults(client):

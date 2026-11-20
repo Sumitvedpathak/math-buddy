@@ -515,3 +515,52 @@ async def unlink_device(
         "Device unlinked",
         extra={"parent_id": str(parent_id), "session_id": str(session_id)},
     )
+
+
+# --- Moving the old email profiles to a parent (one-off script) ---------------------
+
+
+class ClaimFailed(Exception):
+    """Nothing was changed; the message says why."""
+
+
+async def claim_legacy_profiles(
+    session: AsyncSession, parent_email: str, profile_emails: list[str]
+) -> list[Profile]:
+    """Make the old email profiles children of the parent with this Google email.
+
+    The parent must have signed in once. All or nothing: if any profile is missing
+    or already belongs to another parent, nothing changes.
+    """
+    parent_email = parent_email.strip().lower()
+    parents = list(
+        await session.scalars(
+            select(Parent).where(func.lower(Parent.email) == parent_email)
+        )
+    )
+    if len(parents) != 1:
+        raise ClaimFailed(
+            f"No parent signed in with {parent_email}"
+            if not parents
+            else f"More than one parent has {parent_email}"
+        )
+    parent = parents[0]
+
+    profiles = []
+    for email in profile_emails:
+        email = email.strip().lower()
+        profile = await session.scalar(select(Profile).where(Profile.email == email))
+        if profile is None:
+            raise ClaimFailed(f"No profile with email {email}")
+        if profile.parent_id not in (None, parent.id):
+            raise ClaimFailed(f"{email} already belongs to another parent")
+        profiles.append(profile)
+
+    for profile in profiles:
+        profile.parent_id = parent.id
+    await session.commit()
+    logger.info(
+        "Old profiles claimed",
+        extra={"parent_id": str(parent.id), "profile_ids": [str(p.id) for p in profiles]},
+    )
+    return profiles
