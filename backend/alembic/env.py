@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import app.profiles.models  # noqa: F401  (importing a models file registers its tables)
+import app.account.models  # noqa: F401  (importing a models file registers its tables)
+import app.profiles.models  # noqa: F401
 import app.results.models  # noqa: F401
 import app.writing_coach.models  # noqa: F401
 from alembic import context

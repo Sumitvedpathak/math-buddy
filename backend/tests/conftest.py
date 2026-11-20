@@ -6,6 +6,8 @@ import pytest_asyncio
 # Set required environment variables before any app imports
 os.environ.setdefault("OPENROUTER_API_KEY", "test-placeholder")
 os.environ.setdefault("MATH_BUDDY_OPENROUTER_API_KEY", "test-placeholder")
+os.environ.setdefault("MATH_BUDDY_JWT_SECRET", "test-jwt-secret-0123456789abcdef0123456789")
+os.environ.setdefault("MATH_BUDDY_GOOGLE_CLIENT_IDS", "web-client.apps.googleusercontent.com")
 
 ADMIN_TOKEN = "test-admin-token-0123456789abcdef"
 

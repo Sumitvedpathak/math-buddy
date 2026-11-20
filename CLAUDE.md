@@ -21,6 +21,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Parent sign-in (in progress, branch `feature/account-google-signin`)
+
+Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`. Built one step at a time in `backend/app/account/`.
+- **Step 1 (done):** `POST /auth/google {id_token, accepted_terms_version?}` checks the Google ID token (`google-auth`, audience = `MATH_BUDDY_GOOGLE_CLIENT_IDS`, `email_verified` required), finds the parent by Google `sub` or creates one (first time needs `accepted_terms_version` = `MATH_BUDDY_TERMS_VERSION`, else `409 consent_required`), and returns a 15-minute JWT (`MATH_BUDDY_JWT_SECRET`). `GET /me` with `Authorization: Bearer`. Tables `parents`, `auth_identities` (migration `0003`). Tests fake `google.oauth2.id_token.verify_oauth2_token`.
+- **Next:** 2 refresh/logout sessions, 3 children, 4 link codes, 5 devices, 6 lock down existing endpoints (ships with the frontend).
+
 ## Writing Coach (temporary; grade 7 son only)
 
 Written-answer practice for Language and History, marked against the Ontario achievement chart. **Photos are never stored**: the browser compresses/strips EXIF, the Reader agent reads them in memory, only the verbatim transcript (original + confirmed + word diff) and the review are saved.
@@ -102,9 +108,10 @@ backend/app/
   core/              shared plumbing
     config.py          settings from env (pydantic-settings)
     db.py              async engine/session, shared SQLAlchemy Base, JsonType, utcnow
-    deps.py            SessionDep, require_admin
+    deps.py            SessionDep, require_admin, require_signed_in (Bearer access token)
     llm.py             ALL LLM calls (call_llm, call_llm_with_usage, LLMServiceError)
     logging_config.py
+  account/           POST /auth/google, GET /me  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity)
   profiles/          GET /profiles/lookup, POST /profiles          (router, service, schemas, models: Profile)
   curriculum/        GET /curriculum                               (router, service, schemas, data/curriculum.json)
   practice/          POST /questions/generate, POST /answers/evaluate
@@ -225,7 +232,7 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 175 tests (170 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 198 tests (193 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 

@@ -2,12 +2,38 @@ import hmac
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.account.tokens import InvalidAccessToken, TokenClaims, verify_access_token
 from app.core.config import get_settings
 from app.core.db import get_session
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_signed_in(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> TokenClaims:
+    """Any valid Math Buddy access token (`Authorization: Bearer ...`), parent or child."""
+    secret = get_settings().jwt_secret
+    if credentials is None or not secret:
+        raise _not_signed_in()
+    try:
+        return verify_access_token(secret, credentials.credentials)
+    except InvalidAccessToken as exc:
+        raise _not_signed_in() from exc
+
+
+def _not_signed_in() -> HTTPException:
+    return HTTPException(
+        status_code=401, detail="Not signed in", headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+SignedInDep = Annotated[TokenClaims, Depends(require_signed_in)]
 
 
 async def require_admin(
