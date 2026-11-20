@@ -10,6 +10,11 @@ import {
   addChild,
   updateChild,
   createLinkCode,
+  cancelLinkCode,
+  listChildren,
+  listDevices,
+  renameDevice,
+  unlinkDevice,
   toProfile,
 } from './api'
 
@@ -203,5 +208,59 @@ describe('toProfile', () => {
     expect(toProfile({ id: 'c1', display_name: 'Aarav', grade: '7' })).toEqual({
       id: 'c1', email: null, displayName: 'Aarav', grade: '7',
     })
+  })
+})
+
+
+describe('linked devices (parent only)', () => {
+  it('lists the children with their device counts', async () => {
+    const children = [{ id: 'c1', display_name: 'Aarav', grade: '7', linked_devices: 1 }]
+    fetch.mockResolvedValue(jsonResponse(children))
+    expect(await listChildren()).toEqual(children)
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/children')
+  })
+
+  it('cancels the unused code of one child', async () => {
+    fetch.mockResolvedValue({ ok: true, status: 204, text: async () => '' })
+    await cancelLinkCode('c1')
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1/link-codes')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it("lists a child's devices", async () => {
+    fetch.mockResolvedValue(
+      jsonResponse([
+        {
+          session_id: 's1',
+          device_name: 'Chrome on Windows',
+          created_at: '2026-11-18T10:00:00Z',
+          last_used_at: '2026-11-20T09:00:00Z',
+        },
+      ])
+    )
+    expect(await listDevices('c1')).toEqual([
+      { id: 's1', name: 'Chrome on Windows', createdAt: '2026-11-18T10:00:00Z', lastUsedAt: '2026-11-20T09:00:00Z' },
+    ])
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/children/c1/devices')
+  })
+
+  it('renames a device', async () => {
+    fetch.mockResolvedValue(
+      jsonResponse({ session_id: 's1', device_name: 'Laptop', created_at: 'a', last_used_at: 'b' })
+    )
+    expect(await renameDevice('s1', 'Laptop')).toEqual({ id: 's1', name: 'Laptop', createdAt: 'a', lastUsedAt: 'b' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/devices/s1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ device_name: 'Laptop' })
+  })
+
+  it('unlinks a device', async () => {
+    fetch.mockResolvedValue({ ok: true, status: 204, text: async () => '' })
+    await unlinkDevice('s1')
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/devices/s1')
+    expect(init.method).toBe('DELETE')
   })
 })

@@ -29,7 +29,8 @@ Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`
 - **Frontend for steps 1-2 (done):** page `/parent` (`src/app/parent/ParentApp.jsx`, its own route tree in `main.jsx` like `/admin`), linked from the profile screen. `GoogleButton.jsx` loads Google Identity Services directly (client ID from `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`). `src/lib/auth.js` owns tokens: access token in memory only, one shared refresh per tab (retries once on 409), `authFetch` refreshes and retries once on 401. Needs the Vite `/api` proxy (same origin) for the cookie; production needs the nginx proxy (deploy step).
 - **Step 3 (done, backend + `/parent` page):** `GET/POST /children`, `PATCH /children/{id}` (parent token only, `require_parent`/`ParentDep` in `core/deps.py`; a child token gets 403, another parent's child 404). A child is a `profiles` row with `parent_id` and **no email** (`profiles.email` now nullable, migration `0005`). `/me` and sign-in/refresh replies include `children: [{id, display_name, grade}]`. Frontend: `ChildrenSection.jsx` (list, add, edit), calls `addChild`/`updateChild` in `lib/api.js` via `authFetch`.
 - **Step 4 (done, backend + web):** `POST /children/{id}/link-codes` (parent; 8 chars `XXXX-XXXX` from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, 10 min, single use, a new code cancels the child's earlier unused ones, 20 per parent per hour, only the hash stored in `link_codes`, migration `0006`). `POST /auth/link {code, client, device_name?}` (case/space/dash-insensitive; wrong code = `401 Code not valid`; 10 wrong per IP per 15 min = 429, in-memory `link_failures` in `account/router.py`) starts a child session (idle 180 days; device name from the user agent, e.g. "Chrome on Windows"). Child access token: `sub` = profile id, `pid` = parent. `/me` for a child = `{kind:"child", profile}`. Web: "Link a device" + code panel with countdown in `ChildrenSection.jsx`; kid side `LinkCodeForm.jsx` on the profile screen -> `linkWithCode` in SessionContext. On app start SessionContext calls `refreshSession()`: a child session enters that profile (nothing cached in localStorage; `writeCachedIdentity` skips profiles without email), otherwise the old email cache / profile screen. The old profile endpoints stay open until step 6.
-- **Next:** 5 devices, 4 link codes, 5 devices, 6 lock down existing endpoints (ships with the frontend).
+- **Step 5 (done, backend + web):** `GET /children/{id}/devices` -> `[{session_id, device_name, created_at, last_used_at}]` (child sessions not revoked and not idle-expired), `PATCH /devices/{session_id} {device_name}` (1-60 chars), `DELETE /devices/{session_id}` (unlink = revoke; the device is signed out at its next refresh, its current access token still works for up to 15 min), `DELETE /children/{id}/link-codes` (cancel the unused code). Parent-facing child shapes (`GET/POST /children`, `PATCH`, `/me` children) carry `linked_devices` (a count, not stored); the child's own `/me` does not. Another parent's device or the parent's own session = 404. No migration. Web: each child shows "Not linked yet" / "Linked on N devices", a "Devices" panel (`DevicesPanel.jsx`: rename, unlink with a confirm), the code panel has "Cancel code" and polls `GET /children` every 3 s, closing itself with "<name>'s device is linked." once the count goes up.
+- **Next:** 6 lock down existing endpoints (ships with the start screen, 7), 8 deploy.
 
 ## Writing Coach (temporary; grade 7 son only)
 
@@ -81,7 +82,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (215 tests)
+npm run test:run        # Single run (228 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -115,7 +116,7 @@ backend/app/
     deps.py            SessionDep, require_admin, require_signed_in (Bearer access token)
     llm.py             ALL LLM calls (call_llm, call_llm_with_usage, LLMServiceError)
     logging_config.py
-  account/           /auth/*, GET /me, /children, link codes  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity, AuthSession, LinkCode)
+  account/           /auth/*, GET /me, /children, link codes, /devices  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity, AuthSession, LinkCode)
   profiles/          GET /profiles/lookup, POST /profiles          (router, service, schemas, models: Profile)
   curriculum/        GET /curriculum                               (router, service, schemas, data/curriculum.json)
   practice/          POST /questions/generate, POST /answers/evaluate
@@ -236,12 +237,12 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 271 tests (266 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 290 tests (285 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 215 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
+- 228 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)

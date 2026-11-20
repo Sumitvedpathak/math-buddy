@@ -18,7 +18,8 @@ async def test_parent_adds_a_child(client):
     )
     assert resp.status_code == 201
     child = resp.json()
-    assert set(child) == {"id", "display_name", "grade"}  # nothing else about a child
+    # Nothing else is stored about a child; linked_devices is counted, not stored.
+    assert set(child) == {"id", "display_name", "grade", "linked_devices"}
     assert child["display_name"] == "Aarav"
     assert child["grade"] == "7"
 

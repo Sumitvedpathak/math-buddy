@@ -61,6 +61,10 @@ class CodeNotValid(Exception):
     """Unknown, used, cancelled or expired link code. The reason is logged only."""
 
 
+class DeviceNotFound(Exception):
+    """No such linked device, or it belongs to another parent's child."""
+
+
 class RefreshRace(Exception):
     """The token was just rotated by another tab; retrying with the new one works."""
 
@@ -352,15 +356,7 @@ async def create_link_code(
     if made_last_hour >= LINK_CODES_PER_HOUR:
         raise TooManyLinkCodes()
 
-    earlier = await session.scalars(
-        select(LinkCode).where(
-            LinkCode.child_profile_id == child_id, LinkCode.used_at.is_(None)
-        )
-    )
-    for row in earlier:
-        if _aware(row.expires_at) > now:
-            row.expires_at = now  # cancelled
-
+    await _cancel_codes(session, child_id, now)
     code = new_link_code()
     expires_at = now + LINK_CODE_TTL
     session.add(
@@ -378,6 +374,29 @@ async def create_link_code(
         extra={"parent_id": str(parent_id), "profile_id": str(child_id)},
     )
     return code, expires_at
+
+
+async def _cancel_codes(
+    session: AsyncSession, child_id: uuid.UUID, now: datetime
+) -> None:
+    """Make every unused code of this child stop working now (no commit)."""
+    unused = await session.scalars(
+        select(LinkCode).where(
+            LinkCode.child_profile_id == child_id, LinkCode.used_at.is_(None)
+        )
+    )
+    for row in unused:
+        if _aware(row.expires_at) > now:
+            row.expires_at = now
+
+
+async def cancel_link_codes(
+    session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID
+) -> None:
+    """The parent closed the code panel: the shown code stops working."""
+    await get_child(session, parent_id, child_id)
+    await _cancel_codes(session, child_id, utcnow())
+    await session.commit()
 
 
 async def redeem_link_code(
@@ -425,3 +444,74 @@ async def redeem_link_code(
         extra={"session_id": str(auth_session.id), "profile_id": str(child.id)},
     )
     return auth_session, token
+
+
+# --- Linked devices (child sessions) --------------------------------------------------
+
+
+def _signed_in_child_devices(parent_id: uuid.UUID):
+    """Child sessions of this parent that can still refresh."""
+    return select(AuthSession).where(
+        AuthSession.kind == "child",
+        AuthSession.parent_id == parent_id,
+        AuthSession.revoked_at.is_(None),
+        AuthSession.idle_expires_at > utcnow(),
+    )
+
+
+async def linked_device_counts(
+    session: AsyncSession, parent_id: uuid.UUID
+) -> dict[uuid.UUID, int]:
+    """Child profile id -> number of devices signed in as that child."""
+    devices = _signed_in_child_devices(parent_id).subquery()
+    rows = await session.execute(
+        select(devices.c.child_profile_id, func.count()).group_by(
+            devices.c.child_profile_id
+        )
+    )
+    return {child_id: count for child_id, count in rows}
+
+
+async def list_devices(
+    session: AsyncSession, parent_id: uuid.UUID, child_id: uuid.UUID
+) -> list[AuthSession]:
+    await get_child(session, parent_id, child_id)
+    rows = await session.scalars(
+        _signed_in_child_devices(parent_id)
+        .where(AuthSession.child_profile_id == child_id)
+        .order_by(AuthSession.created_at, AuthSession.id)
+    )
+    return list(rows)
+
+
+async def _get_device(
+    session: AsyncSession, parent_id: uuid.UUID, session_id: uuid.UUID
+) -> AuthSession:
+    device = await session.scalar(
+        _signed_in_child_devices(parent_id).where(AuthSession.id == session_id)
+    )
+    if device is None:
+        raise DeviceNotFound()
+    return device
+
+
+async def rename_device(
+    session: AsyncSession, parent_id: uuid.UUID, session_id: uuid.UUID, name: str
+) -> AuthSession:
+    device = await _get_device(session, parent_id, session_id)
+    device.device_name = name
+    await session.commit()
+    return device
+
+
+async def unlink_device(
+    session: AsyncSession, parent_id: uuid.UUID, session_id: uuid.UUID
+) -> None:
+    """Sign the device out: its next refresh fails and it shows the start screen."""
+    device = await _get_device(session, parent_id, session_id)
+    device.revoked_at = utcnow()
+    await session.commit()
+    logger.info(
+        "Device unlinked",
+        extra={"parent_id": str(parent_id), "session_id": str(session_id)},
+    )

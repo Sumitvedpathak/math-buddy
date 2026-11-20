@@ -28,6 +28,11 @@ def fresh_limits():
     link_failures.clear()
 
 
+def as_child_sees(child):
+    """The child's own view of their profile: no device count."""
+    return {k: v for k, v in child.items() if k != "linked_devices"}
+
+
 async def make_code(client, headers, child_id):
     resp = await client.post(f"/api/v1/children/{child_id}/link-codes", headers=headers)
     assert resp.status_code == 201, resp.text
@@ -104,7 +109,7 @@ async def test_child_device_links_with_the_code(client, family):
     resp = await link(client, code)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["me"] == {"kind": "child", "profile": child}
+    assert body["me"] == {"kind": "child", "profile": as_child_sees(child)}
     assert body["refresh_token"]
     claims = jwt.decode(body["access_token"], options={"verify_signature": False})
     assert claims["kind"] == "child"
@@ -178,7 +183,7 @@ async def test_me_on_a_linked_device_is_the_child(client, family):
         "/api/v1/me", headers={"Authorization": f"Bearer {body['access_token']}"}
     )
     assert me.status_code == 200
-    assert me.json() == {"kind": "child", "profile": child}
+    assert me.json() == {"kind": "child", "profile": as_child_sees(child)}
 
 
 async def test_linked_device_refreshes_as_the_child(client, family):
@@ -187,7 +192,7 @@ async def test_linked_device_refreshes_as_the_child(client, family):
         "/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]}
     )
     assert resp.status_code == 200
-    assert resp.json()["me"] == {"kind": "child", "profile": child}
+    assert resp.json()["me"] == {"kind": "child", "profile": as_child_sees(child)}
 
 
 async def test_linked_device_stays_signed_in_far_longer_than_a_parent(

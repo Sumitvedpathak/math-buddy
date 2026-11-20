@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { addChild, createLinkCode, updateChild } from '../../lib/api'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { addChild, cancelLinkCode, createLinkCode, listChildren, updateChild } from '../../lib/api'
+import DevicesPanel from './DevicesPanel'
 
 const GRADES = ['6', '7']
 const inputClass =
@@ -8,14 +9,23 @@ const primaryButton =
   'inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground ring-soft-lg transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed'
 const quietButton = 'rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-muted disabled:opacity-40'
 
-/** The parent's children: list, add, edit name/grade, and link a device. */
+/** While a code is on screen, how often to check whether the child has used it. */
+const LINK_CHECK_MS = 3000
+
+function linkedText(count) {
+  if (!count) return 'Not linked yet'
+  return `Linked on ${count} ${count === 1 ? 'device' : 'devices'}`
+}
+
+/** The parent's children: list, add, edit name/grade, link a device, manage devices. */
 export default function ChildrenSection({ initialChildren }) {
   const [children, setChildren] = useState(initialChildren)
   const [message, setMessage] = useState(null)
 
-  function replaceChild(updated) {
-    setChildren((list) => list.map((c) => (c.id === updated.id ? updated : c)))
-  }
+  const replaceChild = useCallback((updated) => {
+    setChildren((list) => list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)))
+  }, [])
+  const showError = useCallback((text) => setMessage(text ?? 'Could not save. Please try again.'), [])
 
   return (
     <section aria-labelledby="children-title" className="space-y-5">
@@ -30,7 +40,7 @@ export default function ChildrenSection({ initialChildren }) {
               key={child.id}
               child={child}
               onSaved={replaceChild}
-              onError={(text) => setMessage(text ?? 'Could not save. Please try again.')}
+              onError={showError}
             />
           ))}
         </ul>
@@ -72,9 +82,44 @@ function ChildRow({ child, onSaved, onError }) {
   }
 
   const [linkCode, setLinkCode] = useState(null) // { code, expiresAt } while shown
+  const [showDevices, setShowDevices] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const linkedBefore = useRef(0)
+  const linked = child.linked_devices ?? 0
+
+  // While a code is shown, check now and then whether the child has used it.
+  useEffect(() => {
+    if (!linkCode) return undefined
+    const timer = setInterval(async () => {
+      if (Date.now() > new Date(linkCode.expiresAt).getTime()) return
+      try {
+        const latest = (await listChildren()).find((c) => c.id === child.id)
+        if (latest && latest.linked_devices > linkedBefore.current) {
+          setLinkCode(null)
+          setNotice(`${child.display_name}'s device is linked.`)
+          onSaved(latest)
+        }
+      } catch {
+        // try again at the next check
+      }
+    }, LINK_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [linkCode, child.id, child.display_name, onSaved])
+
+  async function cancelCode() {
+    setLinkCode(null)
+    try {
+      await cancelLinkCode(child.id)
+    } catch (err) {
+      console.error('[cancel link code] error:', err)
+      onError('Could not cancel the code. It stops working by itself within 10 minutes.')
+    }
+  }
 
   async function makeLinkCode() {
     setBusy(true)
+    setNotice(null)
+    linkedBefore.current = linked
     try {
       setLinkCode(await createLinkCode(child.id))
     } catch (err) {
@@ -95,9 +140,22 @@ function ChildRow({ child, onSaved, onError }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="font-medium text-ink">{child.display_name}</p>
-            <p className="text-xs text-ink-soft">Grade {child.grade}</p>
+            <p className="text-xs text-ink-soft">
+              Grade {child.grade} · <span className={linked ? 'text-success' : ''}>{linkedText(linked)}</span>
+            </p>
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
+            {linked > 0 && (
+              <button
+                type="button"
+                aria-label={`Devices for ${child.display_name}`}
+                aria-expanded={showDevices}
+                onClick={() => setShowDevices((open) => !open)}
+                className={quietButton}
+              >
+                Devices
+              </button>
+            )}
             <button
               type="button"
               aria-label={`Link a device for ${child.display_name}`}
@@ -121,13 +179,28 @@ function ChildRow({ child, onSaved, onError }) {
             </button>
           </div>
         </div>
+        {notice && (
+          <p role="status" className="mt-2 text-sm text-success">{notice}</p>
+        )}
         {linkCode && (
           <LinkCodePanel
             childName={child.display_name}
             code={linkCode.code}
             expiresAt={linkCode.expiresAt}
-            onDone={() => setLinkCode(null)}
+            onCancel={cancelCode}
+            onClose={() => setLinkCode(null)}
             onNewCode={makeLinkCode}
+          />
+        )}
+        {showDevices && linked > 0 && (
+          <DevicesPanel
+            child={child}
+            onUnlinked={() => {
+              setNotice(null) // "…'s device is linked." is no longer true
+              onSaved({ ...child, linked_devices: Math.max(0, linked - 1) })
+            }}
+            onClose={() => setShowDevices(false)}
+            onError={onError}
           />
         )}
       </li>
@@ -232,7 +305,7 @@ function secondsLeft(expiresAt) {
 }
 
 /** The one-time code, big, with a countdown. The child types it on their own device. */
-function LinkCodePanel({ childName, code, expiresAt, onDone, onNewCode }) {
+function LinkCodePanel({ childName, code, expiresAt, onCancel, onClose, onNewCode }) {
   const [left, setLeft] = useState(() => secondsLeft(expiresAt))
 
   useEffect(() => {
@@ -260,21 +333,27 @@ function LinkCodePanel({ childName, code, expiresAt, onDone, onNewCode }) {
             {code}
           </p>
           <p className="text-xs text-ink-soft">
-            Works once. Expires in <span className="font-mono">{minutes}:{seconds}</span>.
+            Works once. This box closes by itself when the device is linked. Expires in <span className="font-mono">{minutes}:{seconds}</span>.
           </p>
         </>
       ) : (
         <p className="text-sm text-ink-soft">This code has expired.</p>
       )}
       <div className="flex gap-2">
-        {left === 0 && (
-          <button type="button" onClick={onNewCode} className={primaryButton}>
-            Make a new code
+        {left > 0 ? (
+          <button type="button" onClick={onCancel} className={quietButton}>
+            Cancel code
           </button>
+        ) : (
+          <>
+            <button type="button" onClick={onNewCode} className={primaryButton}>
+              Make a new code
+            </button>
+            <button type="button" onClick={onClose} className={quietButton}>
+              Close
+            </button>
+          </>
         )}
-        <button type="button" onClick={onDone} className={quietButton}>
-          Done
-        </button>
       </div>
     </div>
   )

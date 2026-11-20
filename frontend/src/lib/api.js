@@ -277,3 +277,36 @@ export async function createLinkCode(childId) {
   const data = await authFetch(`/children/${encodeURIComponent(childId)}/link-codes`, { method: 'POST' })
   return { code: data.code, expiresAt: data.expires_at }
 }
+
+/** Stop a child's unused code from working (the parent closed the code panel). */
+export function cancelLinkCode(childId) {
+  return authFetch(`/children/${encodeURIComponent(childId)}/link-codes`, { method: 'DELETE' })
+}
+
+/** The parent's children, each with `linked_devices` (how many devices are signed in as them). */
+export function listChildren() {
+  return authFetch('/children')
+}
+
+function toDevice(raw) {
+  return { id: raw.session_id, name: raw.device_name, createdAt: raw.created_at, lastUsedAt: raw.last_used_at }
+}
+
+/** Devices signed in as this child: [{ id, name, createdAt, lastUsedAt }]. */
+export async function listDevices(childId) {
+  const data = await authFetch(`/children/${encodeURIComponent(childId)}/devices`)
+  return data.map(toDevice)
+}
+
+export async function renameDevice(deviceId, name) {
+  const data = await authFetch(`/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'PATCH',
+    body: { device_name: name },
+  })
+  return toDevice(data)
+}
+
+/** Sign the device out. It goes back to the start screen at its next check. */
+export function unlinkDevice(deviceId) {
+  return authFetch(`/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' })
+}

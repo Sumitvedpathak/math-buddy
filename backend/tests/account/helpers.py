@@ -57,3 +57,21 @@ async def add_child(client, headers, name="Aarav", grade="7"):
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
+
+
+async def make_code(client, headers, child_id):
+    resp = await client.post(f"/api/v1/children/{child_id}/link-codes", headers=headers)
+    assert resp.status_code == 201, resp.text
+    return resp.json()["code"]
+
+
+async def link_device(client, headers, child_id, user_agent="Mozilla/5.0"):
+    """Link a new (native) device to the child. Returns the sign-in reply."""
+    code = await make_code(client, headers, child_id)
+    resp = await client.post(
+        "/api/v1/auth/link",
+        json={"code": code, "client": "native"},
+        headers={"User-Agent": user_agent},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()

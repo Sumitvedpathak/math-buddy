@@ -17,10 +17,13 @@ from app.account.schemas import (
     ChildOut,
     ChildUpdate,
     Client,
+    DeviceOut,
+    DeviceRename,
     GoogleSignIn,
     LinkCodeOut,
     LinkIn,
     Me,
+    ParentChildOut,
     ParentMe,
     ParentOut,
     RefreshIn,
@@ -31,20 +34,26 @@ from app.account.service import (
     ChildNotFound,
     CodeNotValid,
     ConsentRequired,
+    DeviceNotFound,
     RefreshFailed,
     RefreshRace,
     SignInFailed,
     TooManyLinkCodes,
     add_child,
+    cancel_link_codes,
     create_link_code,
     end_session,
     get_child,
     get_parent,
+    linked_device_counts,
     list_children,
+    list_devices,
     redeem_link_code,
     refresh_session,
+    rename_device,
     sign_in_with_google,
     start_session,
+    unlink_device,
     update_child,
     verify_google_id_token,
 )
@@ -95,11 +104,34 @@ link_failures = FailureLimiter(limit=10, window_seconds=15 * 60)
 # --- Helpers ----------------------------------------------------------------------
 
 
+async def _for_parent(session, parent_id, children) -> list[ParentChildOut]:
+    """Children as the parent sees them, with their linked-device counts."""
+    counts = await linked_device_counts(session, parent_id)
+    return [
+        ParentChildOut(
+            id=c.id,
+            display_name=c.display_name,
+            grade=c.grade,
+            linked_devices=counts.get(c.id, 0),
+        )
+        for c in children
+    ]
+
+
 async def _parent_me(session, parent: Parent) -> ParentMe:
     children = await list_children(session, parent.id)
     return ParentMe(
         parent=ParentOut.model_validate(parent),
-        children=[ChildOut.model_validate(c) for c in children],
+        children=await _for_parent(session, parent.id, children),
+    )
+
+
+def _device_out(device: AuthSession) -> DeviceOut:
+    return DeviceOut(
+        session_id=device.id,
+        device_name=device.device_name,
+        created_at=device.created_at,
+        last_used_at=device.last_used_at,
     )
 
 
@@ -305,27 +337,31 @@ async def who_am_i(claims: SignedInDep, session: SessionDep):
     return await _parent_me(session, parent)
 
 
-@router.get("/children", response_model=list[ChildOut])
+@router.get("/children", response_model=list[ParentChildOut])
 async def get_children(claims: ParentDep, session: SessionDep):
-    """This parent's children, oldest first."""
-    return await list_children(session, claims.sub)
+    """This parent's children, oldest first, with how many devices each has."""
+    return await _for_parent(
+        session, claims.sub, await list_children(session, claims.sub)
+    )
 
 
-@router.post("/children", response_model=ChildOut, status_code=201)
+@router.post("/children", response_model=ParentChildOut, status_code=201)
 async def create_child(data: ChildCreate, claims: ParentDep, session: SessionDep):
     """Add a child: a name and a grade, nothing else."""
-    return await add_child(session, claims.sub, data)
+    child = await add_child(session, claims.sub, data)
+    return (await _for_parent(session, claims.sub, [child]))[0]
 
 
-@router.patch("/children/{child_id}", response_model=ChildOut)
+@router.patch("/children/{child_id}", response_model=ParentChildOut)
 async def change_child(
     child_id: uuid.UUID, data: ChildUpdate, claims: ParentDep, session: SessionDep
 ):
     """Rename a child or change their grade. Another parent's child is a 404."""
     try:
-        return await update_child(session, claims.sub, child_id, data)
+        child = await update_child(session, claims.sub, child_id, data)
     except ChildNotFound as exc:
         raise HTTPException(status_code=404, detail="Child not found") from exc
+    return (await _for_parent(session, claims.sub, [child]))[0]
 
 
 @router.post(
@@ -342,3 +378,48 @@ async def make_link_code(child_id: uuid.UUID, claims: ParentDep, session: Sessio
             status_code=429, detail="Too many codes. Try again later."
         ) from exc
     return LinkCodeOut(code=code, expires_at=expires_at)
+
+
+@router.delete("/children/{child_id}/link-codes", status_code=204)
+async def cancel_codes(child_id: uuid.UUID, claims: ParentDep, session: SessionDep):
+    """Stop this child's unused code from working (the parent closed the panel)."""
+    try:
+        await cancel_link_codes(session, claims.sub, child_id)
+    except ChildNotFound as exc:
+        raise HTTPException(status_code=404, detail="Child not found") from exc
+    return Response(status_code=204)
+
+
+# --- Linked devices ----------------------------------------------------------------
+
+
+@router.get("/children/{child_id}/devices", response_model=list[DeviceOut])
+async def get_devices(child_id: uuid.UUID, claims: ParentDep, session: SessionDep):
+    """Devices signed in as this child, oldest first."""
+    try:
+        devices = await list_devices(session, claims.sub, child_id)
+    except ChildNotFound as exc:
+        raise HTTPException(status_code=404, detail="Child not found") from exc
+    return [_device_out(d) for d in devices]
+
+
+@router.patch("/devices/{session_id}", response_model=DeviceOut)
+async def change_device(
+    session_id: uuid.UUID, data: DeviceRename, claims: ParentDep, session: SessionDep
+):
+    """Rename a child's device, for example "Aarav's laptop"."""
+    try:
+        device = await rename_device(session, claims.sub, session_id, data.device_name)
+    except DeviceNotFound as exc:
+        raise HTTPException(status_code=404, detail="Device not found") from exc
+    return _device_out(device)
+
+
+@router.delete("/devices/{session_id}", status_code=204)
+async def remove_device(session_id: uuid.UUID, claims: ParentDep, session: SessionDep):
+    """Unlink a child's device: it is signed out at its next refresh."""
+    try:
+        await unlink_device(session, claims.sub, session_id)
+    except DeviceNotFound as exc:
+        raise HTTPException(status_code=404, detail="Device not found") from exc
+    return Response(status_code=204)

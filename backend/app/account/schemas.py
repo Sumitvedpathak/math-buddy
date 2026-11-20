@@ -51,10 +51,16 @@ class ChildOut(BaseModel):
     grade: Grade
 
 
+class ParentChildOut(ChildOut):
+    """A child as the parent sees it: also how many devices are signed in as them."""
+
+    linked_devices: int = 0
+
+
 class ParentMe(BaseModel):
     kind: Literal["parent"] = "parent"
     parent: ParentOut
-    children: list[ChildOut]
+    children: list[ParentChildOut]
 
 
 class ChildMe(BaseModel):
@@ -86,3 +92,21 @@ class SignedIn(BaseModel):
     expires_in: int  # seconds
     me: Me
     refresh_token: str | None = None  # native clients only
+
+
+DeviceName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)
+]
+
+
+class DeviceOut(BaseModel):
+    """A device signed in as a child (one auth session)."""
+
+    session_id: uuid.UUID
+    device_name: str
+    created_at: datetime
+    last_used_at: datetime
+
+
+class DeviceRename(BaseModel):
+    device_name: DeviceName
