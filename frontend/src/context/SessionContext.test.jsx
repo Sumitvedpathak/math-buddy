@@ -3,6 +3,7 @@ import { render, act, waitFor } from '@testing-library/react'
 import { SessionProvider, useSession } from './SessionContext'
 import * as api from '../lib/api'
 import * as auth from '../lib/auth'
+import { openParentArea } from '../lib/navigation'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual('../lib/api')
@@ -16,7 +17,12 @@ vi.mock('../lib/api', async () => {
   }
 })
 
-vi.mock('../lib/auth', () => ({ refreshSession: vi.fn(), linkDevice: vi.fn() }))
+vi.mock('../lib/auth', () => ({
+  refreshSession: vi.fn(),
+  linkDevice: vi.fn(),
+  onSignedOut: vi.fn(() => () => {}),
+}))
+vi.mock('../lib/navigation', () => ({ openParentArea: vi.fn() }))
 
 const PROFILE = { id: 'p1', email: null, displayName: 'Sam', grade: '7' }
 const CHILD_ME = { kind: 'child', profile: { id: 'c1', display_name: 'Aarav', grade: '7' } }
@@ -71,7 +77,7 @@ describe('profile bootstrap', () => {
     expect(ctx.state.profileStatus).toBe('loading')
 
     await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
-    expect(ctx.state.screen).toBe('profile')
+    expect(ctx.state.screen).toBe('start')
     expect(ctx.state.profile).toBeNull()
   })
 
@@ -80,7 +86,7 @@ describe('profile bootstrap', () => {
     mount()
 
     await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
-    expect(ctx.state.screen).toBe('profile')
+    expect(ctx.state.screen).toBe('start')
     expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
   })
 
@@ -112,7 +118,7 @@ describe('profile bootstrap', () => {
   it('detours to the profile screen to practise, then continues to practice', async () => {
     mount()
     act(() => ctx.navigateTo('practice'))
-    expect(ctx.state.screen).toBe('profile')
+    expect(ctx.state.screen).toBe('start')
 
     await act(() => ctx.enterProfile(PROFILE))
     expect(ctx.state.screen).toBe('practice')
@@ -305,12 +311,49 @@ describe('linked child device', () => {
     expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
   })
 
-  it('ignores a parent session in this browser', async () => {
+  it('sends a parent signed in on this browser to the parent area', async () => {
     auth.refreshSession.mockResolvedValue({ kind: 'parent', parent: {}, children: [] })
     mount()
 
-    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
-    expect(ctx.state.screen).toBe('profile')
+    await waitFor(() => expect(openParentArea).toHaveBeenCalled())
+    expect(ctx.state.profile).toBeNull()
+    expect(ctx.state.profileStatus).toBe('loading') // nothing flashes before the page changes
+  })
+
+  it('goes back to the start screen when the device is signed out (unlinked)', async () => {
+    let signedOut
+    auth.onSignedOut.mockImplementation((listener) => {
+      signedOut = listener
+      return () => {}
+    })
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+
+    act(() => signedOut())
+
+    expect(ctx.state.screen).toBe('start')
+    expect(ctx.state.profile).toBeNull()
+    expect(ctx.state.profileStatus).toBe('none')
+    expect(ctx.state.signedOut).toBe(true)
+  })
+
+  it('a new code clears the signed-out note', async () => {
+    let signedOut
+    auth.onSignedOut.mockImplementation((listener) => {
+      signedOut = listener
+      return () => {}
+    })
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    auth.linkDevice.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+    act(() => signedOut())
+
+    await act(() => ctx.linkWithCode('7K4Q-9PXM'))
+
+    expect(ctx.state.signedOut).toBe(false)
+    expect(ctx.state.screen).toBe('home')
   })
 
   it('links this browser with a code and enters the child profile', async () => {

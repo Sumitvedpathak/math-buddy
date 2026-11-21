@@ -10,7 +10,7 @@ const rootEl = document.getElementById('root')
 
 // /admin/<token> is a separate route tree: no session, no links to it from the child app.
 const adminToken = adminTokenFromPath(window.location.pathname)
-// /parent: parent sign-in, also its own route tree until the start screen replaces the profile screen.
+// /parent: the parent area, its own route tree. The kids' app sends a signed-in parent here.
 const parentPage = isParentPath(window.location.pathname)
 
 ReactDOM.createRoot(rootEl).render(

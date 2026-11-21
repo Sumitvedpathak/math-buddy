@@ -9,7 +9,8 @@ import {
   toProfile,
 } from '../lib/api'
 import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
-import { linkDevice, refreshSession } from '../lib/auth'
+import { linkDevice, onSignedOut, refreshSession } from '../lib/auth'
+import { openParentArea } from '../lib/navigation'
 
 /**
  * @typedef {import('../lib/api').Question} Question
@@ -19,7 +20,7 @@ import { linkDevice, refreshSession } from '../lib/auth'
  */
 
 /**
- * @typedef {"profile"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"|"writingCoach"} AppScreen
+ * @typedef {"start"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"|"writingCoach"} AppScreen
  */
 
 /**
@@ -35,6 +36,7 @@ import { linkDevice, refreshSession } from '../lib/auth'
  * @property {{message: string, retryFn: () => void}|null} error
  * @property {Profile|null} profile - the signed-in child (from the server; nothing is kept in localStorage)
  * @property {"none"|"loading"|"ready"} profileStatus
+ * @property {boolean} signedOut - this device was signed out while in use (e.g. unlinked by a parent)
  * @property {AppScreen|null} pendingScreen - where to go once a profile has been loaded
  * @property {Array} curriculum - units for the profile's grade (empty for grade 6)
  * @property {Record<string, {completed: boolean, bestScorePct: number}>} lessonStatus
@@ -95,6 +97,7 @@ const INITIAL_STATE = {
   error: null,
   profile: null,
   profileStatus: 'none',
+  signedOut: false,
   pendingScreen: null,
   curriculum: [],
   lessonStatus: {},
@@ -190,6 +193,7 @@ export function SessionProvider({ children }) {
       curriculum,
       lessonStatus,
       error: null,
+      signedOut: false,
       screen: keepScreen ? s.screen : s.pendingScreen || 'home',
       pendingScreen: null,
     }))
@@ -201,8 +205,8 @@ export function SessionProvider({ children }) {
     await enterProfile(toProfile(me.profile))
   }, [enterProfile])
 
-  // On start: ask the server whether this browser is a linked child device (refresh
-  // cookie). Yes: enter that child. No (or a parent's sign-in): the profile screen.
+  // On start: ask the server who this browser is signed in as (refresh cookie).
+  // A linked child: enter that child. A parent: the parent area. Nobody: the start screen.
   useEffect(() => {
     let cancelled = false
     forgetOldEmailSignIn()
@@ -210,8 +214,12 @@ export function SessionProvider({ children }) {
     async function resume() {
       const me = await refreshSession().catch(() => null)
       if (cancelled) return
+      if (me?.kind === 'parent') {
+        openParentArea() // stays 'loading' until the page changes
+        return
+      }
       if (me?.kind !== 'child') {
-        setState((s) => ({ ...s, profileStatus: 'none', screen: 'profile' }))
+        setState((s) => ({ ...s, profileStatus: 'none', screen: 'start' }))
         return
       }
       try {
@@ -238,6 +246,18 @@ export function SessionProvider({ children }) {
       cancelled = true
     }
   }, [enterProfile])
+
+  // Signed out while in use (a parent unlinked this device, or it expired): back to the
+  // start screen. Everything about the child is dropped from memory.
+  useEffect(
+    () =>
+      onSignedOut(() => {
+        setState((s) =>
+          s.profile ? { ...INITIAL_STATE, profileStatus: 'none', screen: 'start', signedOut: true } : s
+        )
+      }),
+    []
+  )
 
   /* ── Sessions ── */
 
@@ -375,7 +395,7 @@ export function SessionProvider({ children }) {
   const navigateTo = useCallback((screen) => {
     setState((s) =>
       screen === 'practice' && !s.profile
-        ? { ...s, screen: 'profile', pendingScreen: 'practice' }
+        ? { ...s, screen: 'start', pendingScreen: 'practice' }
         : { ...s, screen }
     )
   }, [])

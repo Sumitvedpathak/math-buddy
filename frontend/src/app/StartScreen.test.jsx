@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import ProfileScreen from './ProfileScreen'
+import StartScreen from './StartScreen'
 import { SessionContext } from '../context/SessionContext'
 
 let ctx
 beforeEach(() => {
   ctx = {
-    state: { screen: 'profile' },
+    state: { screen: 'start', signedOut: false },
     linkWithCode: vi.fn(),
   }
 })
@@ -15,26 +15,39 @@ beforeEach(() => {
 function setup() {
   render(
     <SessionContext.Provider value={ctx}>
-      <ProfileScreen />
+      <StartScreen />
     </SessionContext.Provider>
   )
   return userEvent.setup()
 }
 
-describe('ProfileScreen', () => {
-  it('has no email sign-in any more: only the code from a parent', () => {
+describe('StartScreen', () => {
+  it("offers the two ways in: I'm a kid, I'm a parent", () => {
     setup()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
-    expect(screen.getByLabelText(/code from your parent/i)).toBeInTheDocument()
+    const kid = screen.getByRole('region', { name: /i'm a kid/i })
+    expect(within(kid).getByLabelText(/code from your parent/i)).toBeInTheDocument()
+    const parent = screen.getByRole('region', { name: /i'm a parent/i })
+    expect(within(parent).getByRole('link', { name: /sign in with google/i })).toHaveAttribute('href', '/parent')
   })
 
-  it('points parents to their sign-in page', () => {
+  it('has no email sign-in', () => {
     setup()
-    expect(screen.getByRole('link', { name: /sign in with google/i })).toHaveAttribute('href', '/parent')
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
+  })
+
+  it('says why when this device was signed out (unlinked by a parent)', () => {
+    ctx.state.signedOut = true
+    setup()
+    expect(screen.getByRole('status')).toHaveTextContent(/signed out on this device/i)
+  })
+
+  it('says nothing about signing out on a normal visit', () => {
+    setup()
+    expect(screen.queryByText(/signed out on this device/i)).not.toBeInTheDocument()
   })
 })
 
-describe('ProfileScreen link code', () => {
+describe('StartScreen link code', () => {
   it('links this device with the code from a parent', async () => {
     ctx.linkWithCode.mockResolvedValue(undefined)
     const user = setup()

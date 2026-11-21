@@ -26,6 +26,16 @@ export class ConsentRequiredError extends Error {
 
 let accessToken = null
 let refreshing = null // the one refresh in flight, shared by every caller in this tab
+const signedOutListeners = new Set()
+
+/**
+ * Call `listener` when a request finds this device is no longer signed in (the refresh
+ * failed too: unlinked by a parent, expired, or signed out elsewhere). Returns a stop function.
+ */
+export function onSignedOut(listener) {
+  signedOutListeners.add(listener)
+  return () => signedOutListeners.delete(listener)
+}
 
 export function getAccessToken() {
   return accessToken
@@ -129,8 +139,12 @@ export async function authFetch(path, { method = 'GET', body } = {}) {
     })
 
   let response = await send()
-  if (response.status === 401 && (await refreshSession())) {
-    response = await send()
+  if (response.status === 401) {
+    if (await refreshSession()) {
+      response = await send()
+    } else {
+      signedOutListeners.forEach((listener) => listener())
+    }
   }
   if (!response.ok) throw await readError(response)
   return response.status === 204 ? null : response.json()

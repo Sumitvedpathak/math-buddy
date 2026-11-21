@@ -5,6 +5,7 @@ import {
   authFetch,
   getAccessToken,
   linkDevice,
+  onSignedOut,
   refreshSession,
   resetAuthForTests,
   signInWithGoogle,
@@ -144,6 +145,32 @@ describe('authFetch', () => {
       .mockResolvedValueOnce(jsonResponse({ detail: 'Not signed in' }, 401))
 
     await expect(authFetch('/me')).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('tells the app the device is signed out when the refresh fails too', async () => {
+    const listener = vi.fn()
+    const stop = onSignedOut(listener)
+    fetch
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Not signed in' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Not signed in' }, 401))
+
+    await expect(authFetch('/me')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
+  it('does not report a sign-out for other errors, or after the listener stops', async () => {
+    const listener = vi.fn()
+    const stop = onSignedOut(listener)
+    fetch.mockResolvedValueOnce(jsonResponse({ detail: 'Children only' }, 403))
+    await expect(authFetch('/me')).rejects.toMatchObject({ status: 403 })
+
+    stop()
+    fetch
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Not signed in' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Not signed in' }, 401))
+    await expect(authFetch('/me')).rejects.toMatchObject({ status: 401 })
+    expect(listener).not.toHaveBeenCalled()
   })
 })
 

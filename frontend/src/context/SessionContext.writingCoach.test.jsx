@@ -13,6 +13,7 @@ vi.mock('../lib/api', async (importOriginal) => ({
 vi.mock('../lib/auth', () => ({
   refreshSession: vi.fn().mockResolvedValue({ kind: 'child', profile: { id: 'c1', display_name: 'Sam', grade: '7' } }),
   linkDevice: vi.fn(),
+  onSignedOut: vi.fn(() => () => {}),
 }))
 
 const FLAG = 'mathBuddy.wc.open'
