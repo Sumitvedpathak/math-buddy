@@ -3,20 +3,26 @@ Integration tests: POST /api/v1/questions/generate with mocked OpenRouter.
 Verifies the full request→service→response pipeline.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
-from tests.kids import CHILD
-
 from app.main import app
+from tests.kids import CHILD
 
 client = TestClient(app, headers=CHILD())  # practice needs a signed-in child
 
 
 GOOD_LLM_RESPONSE = {
     "questions": [
-        {"id": "id1", "topic": "Vedic Maths", "problem_type": "multiplication", "text": "13 × 17", "difficulty_tier": 1},
+        {
+            "id": "id1",
+            "topic": "Vedic Maths",
+            "problem_type": "multiplication",
+            "text": "13 × 17",
+            "difficulty_tier": 1,
+        },
         {"id": "id2", "topic": "Algebra", "problem_type": "division", "text": "144 ÷ 12", "difficulty_tier": 2},
         {"id": "id3", "topic": "Algebra", "problem_type": "fractions", "text": "3/6", "difficulty_tier": 3},
         {"id": "id4", "topic": "Algebra", "problem_type": "mixed_fractions", "text": "1½ + 2¼", "difficulty_tier": 4},

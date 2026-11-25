@@ -110,7 +110,8 @@ async def test_full_session_flow(client, llm, monkeypatch):
 
     # he may fix a misread word but not add content
     big = TRANSCRIPT + " and a lot of brand new sentences he did not write on paper at all"
-    assert (await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": big})).status_code == 422
+    r = await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": big})
+    assert r.status_code == 422
     fixed = TRANSCRIPT.replace("deprted", "deported")
     c = await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})
     assert c.status_code == 200
@@ -126,7 +127,8 @@ async def test_full_session_flow(client, llm, monkeypatch):
 
     # model answer unlocks after the draft review; editing a reviewed answer is refused
     assert (await client.post(f"/api/v1/wc/sessions/{sid}/model-answer", headers=h)).status_code == 200
-    assert (await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})).status_code == 409
+    r = await client.put(f"/api/v1/wc/submissions/{sub_id}/transcript", headers=h, json={"text": fixed})
+    assert r.status_code == 409
 
     # rewrite, then log the goal
     rw = await client.post(f"/api/v1/wc/sessions/{sid}/read", headers=h, json={"kind": "rewrite", "images": [IMG]})
@@ -197,7 +199,9 @@ async def test_sessions_are_private_to_their_profile(client, llm):
 async def test_image_validation(client, llm):
     h, _ = await make_profile(client)
     s = await start_session(client, h)
-    r = await client.post(f"/api/v1/wc/sessions/{s['id']}/read", headers=h, json={"kind": "draft", "images": ["not-an-image"]})
+    r = await client.post(
+        f"/api/v1/wc/sessions/{s['id']}/read", headers=h, json={"kind": "draft", "images": ["not-an-image"]}
+    )
     assert r.status_code == 422
 
 
@@ -234,7 +238,8 @@ async def test_parent_routes_need_the_admin_token_and_show_levels_only(client, l
     await client.post(f"/api/v1/wc/submissions/{sub_id}/review", headers=h)
 
     assert (await client.get(f"/api/v1/wc/parent/sessions?profile_id={pid}")).status_code == 404
-    rows = (await client.get(f"/api/v1/wc/parent/sessions?profile_id={pid}", headers={"X-Admin-Token": ADMIN_TOKEN})).json()
+    admin = {"X-Admin-Token": ADMIN_TOKEN}
+    rows = (await client.get(f"/api/v1/wc/parent/sessions?profile_id={pid}", headers=admin)).json()
     assert rows[0]["draft"]["level"] == "3-" and rows[0]["question"]
     assert set(rows[0]) == {"id", "created_at", "subject", "question", "status", "draft", "rewrite", "corrections"}
 

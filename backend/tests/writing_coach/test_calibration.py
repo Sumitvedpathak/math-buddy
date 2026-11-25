@@ -24,7 +24,10 @@ ITEM = {
 }
 
 # SAMPLE (labelled): Level 2 - correct but brief and general.
-LEVEL_2 = "The Acadians were forced to leave Nova Scotia in 1755. It was a bad thing for them. Their farms were taken and they went on ships."
+LEVEL_2 = (
+    "The Acadians were forced to leave Nova Scotia in 1755. It was a bad thing for them. "
+    "Their farms were taken and they went on ships."
+)
 
 # SAMPLE (labelled): Level 3 - answers fully, specific evidence, justified.
 LEVEL_3 = (

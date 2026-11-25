@@ -5,10 +5,11 @@ Unit tests for question_service.py:
 - Validates that questions are sorted by difficulty_tier ascending
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from app.practice.question_service import generate_questions, _validate_vedic
+import pytest
+
+from app.practice.question_service import _validate_vedic, generate_questions
 from app.practice.schemas import GenerateQuestionsRequest
 
 
@@ -24,7 +25,13 @@ def _make_request(**kwargs):
 
 def _all_types_response(question_overrides=None):
     questions = [
-        {"id": "id1", "topic": "Vedic Maths", "problem_type": "multiplication", "text": "13 × 17", "difficulty_tier": 3},
+        {
+            "id": "id1",
+            "topic": "Vedic Maths",
+            "problem_type": "multiplication",
+            "text": "13 × 17",
+            "difficulty_tier": 3,
+        },
         {"id": "id2", "topic": "Algebra", "problem_type": "division", "text": "144 ÷ 12", "difficulty_tier": 2},
         {"id": "id3", "topic": "Algebra", "problem_type": "fractions", "text": "3/6", "difficulty_tier": 1},
         {"id": "id4", "topic": "Algebra", "problem_type": "mixed_fractions", "text": "1½ + 2¼", "difficulty_tier": 4},
