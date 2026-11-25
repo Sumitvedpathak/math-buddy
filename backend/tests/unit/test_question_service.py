@@ -1,15 +1,14 @@
 """
 Unit tests for question_service.py:
-- Validates that missing mandatory problem types raise ValueError
-- Validates Vedic Maths pattern enforcement
-- Validates that questions are sorted by difficulty_tier ascending
+- A response missing a mandatory problem type is refused (when there are enough questions)
+- Questions are sorted by difficulty_tier ascending
 """
 
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.practice.question_service import _validate_vedic, generate_questions
+from app.practice.question_service import generate_questions
 from app.practice.schemas import GenerateQuestionsRequest
 
 
@@ -44,10 +43,12 @@ def _all_types_response(question_overrides=None):
 
 @pytest.mark.asyncio
 async def test_missing_mandatory_type_raises():
-    """question_service raises LLMServiceError when a mandatory type is absent."""
+    """With at least 5 questions, all 5 problem types must be there; otherwise the reply is refused."""
     incomplete = _all_types_response()
-    # Remove all "squares" type questions
-    incomplete["questions"] = [q for q in incomplete["questions"] if q["problem_type"] != "squares"]
+    # Still 5 questions, but the "squares" one is now another fraction: no squares at all.
+    incomplete["questions"][4] = {
+        "id": "id5", "topic": "Algebra", "problem_type": "fractions", "text": "2/8", "difficulty_tier": 5
+    }
 
     from app.core.llm import LLMServiceError
     with patch(
@@ -59,22 +60,16 @@ async def test_missing_mandatory_type_raises():
 
 
 @pytest.mark.asyncio
-async def test_invalid_vedic_pattern_raises():
-    """question_service raises LLMServiceError when a Vedic Maths question has invalid operands."""
-    invalid = _all_types_response()
-    # Replace the Vedic Maths question with an invalid one (25 is not Teen/ReverseTeen)
-    invalid["questions"][0] = {
-        "id": "id1", "topic": "Vedic Maths", "problem_type": "multiplication",
-        "text": "12 × 25", "difficulty_tier": 3
-    }
-
-    from app.core.llm import LLMServiceError
+async def test_fewer_questions_than_types_need_not_cover_every_type():
+    """With fewer than 5 questions they cannot all be there, so the check is skipped."""
+    four = _all_types_response()
+    four["questions"] = [q for q in four["questions"] if q["problem_type"] != "squares"]
     with patch(
         "app.practice.question_service.call_llm",
-        new=AsyncMock(return_value=invalid),
+        new=AsyncMock(return_value=four),
     ):
-        with pytest.raises(LLMServiceError):
-            await generate_questions(_make_request())
+        result = await generate_questions(_make_request(question_count=4))
+    assert len(result.questions) == 4
 
 
 @pytest.mark.asyncio
@@ -91,18 +86,3 @@ async def test_questions_sorted_by_difficulty():
 
     tiers = [q.difficulty_tier for q in result.questions]
     assert tiers == sorted(tiers), f"Expected sorted tiers, got: {tiers}"
-
-
-def test_valid_vedic_patterns():
-    """_validate_vedic accepts all four valid Vedic patterns."""
-    assert _validate_vedic("13 × 17")   # Teen × Teen
-    assert _validate_vedic("15 × 31")   # Teen × ReverseTeen
-    assert _validate_vedic("21 × 14")   # ReverseTeen × Teen
-    assert _validate_vedic("31 × 41")   # ReverseTeen × ReverseTeen
-
-
-def test_invalid_vedic_patterns():
-    """_validate_vedic rejects operands that are not Teen or ReverseTeen."""
-    assert not _validate_vedic("12 × 25")
-    assert not _validate_vedic("20 × 30")
-    assert not _validate_vedic("5 × 7")

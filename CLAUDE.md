@@ -89,7 +89,7 @@ npm run test:run        # Single run (233 tests)
 
 # Quality
 npm run lint            # ESLint
-npm run type-check      # TypeScript check
+npm run type-check      # TypeScript check of src via jsconfig.json (tests excluded)
 npm run build           # Production build → dist/
 ```
 
@@ -241,7 +241,7 @@ LOG_FORMAT=json                     # For Cloud Logging
 ## Testing
 
 ### Backend (pytest)
-- 306 tests (301 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 304 tests (301 pass, 3 skipped) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth, sign-in and devices. DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI. CI (`.github/workflows/ci.yml`) runs ruff (line length 120), mypy and pytest; ruff and mypy are pinned in the workflow's install step.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 

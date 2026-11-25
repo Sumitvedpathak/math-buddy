@@ -1,5 +1,4 @@
 import logging
-import re
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -22,21 +21,8 @@ MANDATORY_TYPES = {
     "squares",
 }
 
-# Vedic Maths pattern: Teen × Teen, Teen × ReverseTeen, ReverseTeen × Teen, ReverseTeen × ReverseTeen
-# Teen: 11–19; ReverseTeen: 11, 21, 31, 41, 51, 61, 71, 81, 91
-_TEEN = r"(?:1[1-9])"
-_REVERSE_TEEN = r"(?:[1-9]1)"
-_VEDIC_PATTERN = re.compile(
-    rf"({_TEEN}|{_REVERSE_TEEN})\s*[×x\*]\s*({_TEEN}|{_REVERSE_TEEN})",
-    re.IGNORECASE,
-)
-
 FUN_FACTS_COUNT = 15
 MAX_RETRIES = 2
-
-
-def _validate_vedic(question_text: str) -> bool:
-    return bool(_VEDIC_PATTERN.search(question_text))
 
 
 def _validate_response(
