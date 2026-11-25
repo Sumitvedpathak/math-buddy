@@ -213,7 +213,7 @@ describe('ParentApp link a device', () => {
 
   it('copies the code so it can be sent to the child', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window.navigator, 'clipboard', { value: { writeText }, configurable: true })
     refreshSession.mockResolvedValue({ ...ME, children: [AARAV] })
     const inTenMinutes = new Date(Date.now() + 10 * 60 * 1000).toISOString()
     createLinkCode.mockResolvedValue({ code: '7K4Q-9PXM', expiresAt: inTenMinutes })
