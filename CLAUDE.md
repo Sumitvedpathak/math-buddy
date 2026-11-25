@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Math Buddy** is an AI-powered math practice app for children (ages 9–12). Students select topics and age groups, answer questions via sketch or typed text, and receive instant AI-marked feedback with a results dashboard. Session state (questions, answers, results) lives in React Context and is cleared on tab close. Since the grade 7 curriculum work (Oct 2026), child **profiles, attempts and lesson progress persist in Postgres** — see "Grade 7 Curriculum Tracking" below. Since parent sign-in step 6, every child endpoint needs a sign-in (a linked device), and signing in needs the database, so Postgres is no longer optional in practice.
 
-**Current status**: EduSpark dark design system migration complete (May 2026), deployed to GCP Cloud Run (frontend: `math-buddy-app`, backend: `math-buddy-api`). Grade 7 curriculum tracking (spec: `docs/superpowers/specs/2026-10-20-grade7-curriculum-design.md`) is built on branches `feature/grade7-backend` (Phase 1) and `feature/grade7-frontend` (Phase 2) but **not yet deployed** — Cloud Run still needs a Postgres instance, `MATH_BUDDY_DATABASE_URL` / `MATH_BUDDY_ADMIN_TOKEN` secrets, and `alembic upgrade head`.
+**Current status** (2026-11-24): live on GCP Cloud Run (frontend `math-buddy-app`, backend `math-buddy-api`) with Neon Postgres: grade 7 curriculum tracking, Writing Coach, and parent sign-in with child device linking (`backend:v6`, `frontend:v7`). **Local `backend/.env` points at the production Neon database**, so local testing writes real data.
 
 ---
 
@@ -32,7 +32,8 @@ Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`
 - **Step 5 (done, backend + web):** `GET /children/{id}/devices` -> `[{session_id, device_name, created_at, last_used_at}]` (child sessions not revoked and not idle-expired), `PATCH /devices/{session_id} {device_name}` (1-60 chars), `DELETE /devices/{session_id}` (unlink = revoke; the device is signed out at its next refresh, its current access token still works for up to 15 min), `DELETE /children/{id}/link-codes` (cancel the unused code). Parent-facing child shapes (`GET/POST /children`, `PATCH`, `/me` children) carry `linked_devices` (a count, not stored); the child's own `/me` does not. Another parent's device or the parent's own session = 404. No migration. Web: each child shows "Not linked yet" / "Linked on N devices", a "Devices" panel (`DevicesPanel.jsx`: rename, unlink with a confirm), the code panel has "Cancel code" and polls `GET /children` every 3 s, closing itself with "<name>'s device is linked." once the count goes up.
 - **Step 6 (done, backend + web):** existing endpoints locked down. `core/deps.py`: `require_child`/`ChildDep` (parent token = 403) and `current_child`/`ChildProfileDep` (the profile from the token; a child that is gone or no longer belongs to the token's parent = 401). Practice router (`generate`/`evaluate`) needs a child token; `GET /curriculum` any sign-in; `POST /attempts` takes the child from the token (`profile_id` removed from `AttemptCreate`); `GET /me/lesson-status` replaces `/profiles/{id}/lesson-status`; Writing Coach student routes use `ChildProfileDep` (grade 7 check kept), not `X-Profile-Id`. Removed: `app/profiles/router.py` (`/profiles/lookup`, `POST /profiles`) and its service/schema code. Old email profiles are given to a parent with `uv run python scripts/assign_profiles_to_parent.py --parent-email <google email> --profile-email <email> ...` (`claim_legacy_profiles` in `account/service.py`; parent must have signed in once; all or nothing; never takes another parent's child). Tests: `tests/kids.py` (`make_kid` = real parent + child + link flow with Google faked; `token_headers`/`CHILD()` = token only). Web: `api.js` child calls go through `authFetch`; `wcApi.js` child calls too (their first `profileId` argument is ignored); `SessionContext` has no email cache (`mathBuddy.profile` is deleted on start), no `findProfile`/`registerProfile`/`switchProfile`; `ProfileScreen` is just the code box + parent link; the header has no "Switch profile". **Deploy backend and frontend together** (the old frontend cannot sign in).
 - **Step 7 (done, web only):** `StartScreen.jsx` (screen `start`, replaces `profile`/`ProfileScreen`): "I'm a kid" (`LinkCodeForm`) and "I'm a parent" (link to `/parent`). On start `SessionContext` calls `refreshSession()`: child -> that child's home, parent -> `openParentArea()` (`lib/navigation.js`, `window.location.assign('/parent')`), nobody -> start screen. `auth.js` `onSignedOut(listener)`: `authFetch` calls it when a 401 survives the refresh (device unlinked/expired); `SessionContext` then drops the child and shows the start screen with "You've been signed out on this device" (`state.signedOut`).
-- **Next:** 8 deploy. Later (deferred by the owner): delete a child with all their data.
+- **Step 8 (done, 2026-11-24):** deployed. `frontend/nginx.conf.template` proxies `/api/` to `API_UPSTREAM` (Cloud Run env var) so the app and API share one address (needed for the cookie); `Dockerfile.prod` takes `VITE_GOOGLE_CLIENT_ID` (production OAuth client, separate from the local one) and no `VITE_API_URL`. Backend got secret `MATH_BUDDY_JWT_SECRET` and env `MATH_BUDDY_GOOGLE_CLIENT_IDS`. The sons' old profiles were claimed by the family parent account. See `deploy-gcp.md`.
+- **Known limits / later:** delete a child with all their data (deferred by the owner); behind the nginx proxy the backend sees the proxy's address, so the "10 wrong codes per 15 min" limit is shared by everyone (fine for one family, fix before a public launch); an unlinked device keeps working until its 15-minute access token runs out.
 
 ## Writing Coach (temporary; grade 7 son only)
 
@@ -217,7 +218,8 @@ LOG_FORMAT=json                     # For Cloud Logging
 **Important**: The model ID must be `google/gemini-2.0-flash-001`, not `google/gemini-2.0-flash` (invalid on OpenRouter).
 
 ### Frontend (Vite)
-- `VITE_API_URL` — set at build time, no `.env` file needed locally (vite.config.js proxies `/api` to `http://localhost:8000` in dev mode)
+- `VITE_GOOGLE_CLIENT_ID` — Google OAuth client for the parent sign-in button (`frontend/.env.local` locally; a build arg for the production image).
+- `VITE_API_URL` — optional and unused in production: the app calls `/api` on its own address (vite.config.js proxies it to `http://localhost:8000` in dev; nginx proxies it in production).
 
 ---
 
@@ -229,10 +231,10 @@ LOG_FORMAT=json                     # For Cloud Logging
 
 **Deployment steps** (from `deploy-gcp.md`):
 1. Build backend Docker image, push to Artifact Registry, deploy as Cloud Function
-2. Build frontend with `VITE_API_URL=$BACKEND_URL`, push, deploy
+2. Build frontend with `--build-arg VITE_GOOGLE_CLIENT_ID=<production client>`, push, deploy with env `API_UPSTREAM=<backend URL>`
 3. Update backend CORS_ORIGINS env var to include frontend URL
 
-**Key**: Frontend build requires `VITE_API_URL` as a Docker build arg. See `frontend/Dockerfile.prod` and `frontend/nginx.conf` for production setup (two-stage build, Nginx serving static files).
+**Key**: nginx serves the app and proxies `/api/` to the backend (`frontend/nginx.conf.template`, filled from `API_UPSTREAM` at start). See `frontend/Dockerfile.prod` (two-stage build).
 
 ---
 
