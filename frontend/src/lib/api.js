@@ -22,37 +22,11 @@
  * @property {Record<string, {score: number, maxScore: number, questionCount: number}>} topicBreakdown
  */
 
+import { authFetch } from './auth'
+
 const BASE_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1` 
   : '/api/v1'
-
-/**
- * @param {string} url
- * @param {Object} body
- * @returns {Promise<Object>}
- */
-async function postJson(url, body) {
-  const response = await fetch(`${BASE_URL}${url}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    let message = `API error ${response.status}: ${text}`
-    try {
-      // Show the server's own message (e.g. "The AI helper is busy…") instead of raw JSON.
-      const { detail } = JSON.parse(text)
-      if (typeof detail === 'string' && detail) message = detail
-    } catch {
-      // not JSON — keep the raw text
-    }
-    const err = new Error(message)
-    err.status = response.status
-    throw err
-  }
-  return response.json()
-}
 
 /**
  * Generate questions for a session.
@@ -63,15 +37,18 @@ async function postJson(url, body) {
  * @returns {Promise<{questions: Question[], fun_facts: string[]}>}
  */
 export async function generateQuestions(topics, ageGroup, questionCount, lessonId) {
-  return postJson('/questions/generate', {
-    topics,
-    age_group: ageGroup,
-    question_count: questionCount,
-    ...(lessonId ? { lesson_id: lessonId } : {}),
+  return authFetch('/questions/generate', {
+    method: 'POST',
+    body: {
+      topics,
+      age_group: ageGroup,
+      question_count: questionCount,
+      ...(lessonId ? { lesson_id: lessonId } : {}),
+    },
   })
 }
 
-/** @param {string} url */
+/** Plain GET for the admin page (its own token header, no sign-in). @param {string} url */
 async function getJson(url, headers = {}) {
   const response = await fetch(`${BASE_URL}${url}`, { headers })
   if (!response.ok) {
@@ -86,34 +63,14 @@ async function getJson(url, headers = {}) {
 /**
  * @typedef {Object} Profile
  * @property {string} id
- * @property {string} email
+ * @property {string|null} email - null for a child added by a parent
  * @property {string} displayName
  * @property {"6"|"7"} grade
  */
 
-function toProfile(raw) {
-  return { id: raw.id, email: raw.email, displayName: raw.display_name, grade: raw.grade }
-}
-
-/**
- * Read-only existence check — never creates a profile.
- * @param {string} email
- * @returns {Promise<Profile|null>}
- */
-export async function lookupProfile(email) {
-  const raw = await getJson(`/profiles/lookup?email=${encodeURIComponent(email)}`)
-  return raw.exists ? toProfile(raw.profile) : null
-}
-
-/**
- * Create a profile. Only call after the user has explicitly confirmed.
- * @param {{email: string, displayName: string, grade: "6"|"7"}} input
- * @returns {Promise<Profile>}
- */
-export async function createProfile({ email, displayName, grade }) {
-  return toProfile(
-    await postJson('/profiles', { email, display_name: displayName, grade })
-  )
+/** Server profile -> app profile. Children added by a parent have no email. */
+export function toProfile(raw) {
+  return { id: raw.id, email: raw.email ?? null, displayName: raw.display_name, grade: raw.grade }
 }
 
 /**
@@ -122,17 +79,16 @@ export async function createProfile({ email, displayName, grade }) {
  * @returns {Promise<Array<{id: string, number: number, title: string, lessons: Array<{id: string, title: string, focus: string, keywords: string[]}>}>>}
  */
 export async function fetchCurriculum(grade) {
-  const raw = await getJson(`/curriculum?grade=${encodeURIComponent(grade)}`)
+  const raw = await authFetch(`/curriculum?grade=${encodeURIComponent(grade)}`)
   return raw.units
 }
 
 /**
- * Current completion state per attempted lesson, keyed by lesson id.
- * @param {string} profileId
+ * The signed-in child's completion state per attempted lesson, keyed by lesson id.
  * @returns {Promise<Record<string, {completed: boolean, bestScorePct: number}>>}
  */
-export async function fetchLessonStatus(profileId) {
-  const rows = await getJson(`/profiles/${profileId}/lesson-status`)
+export async function fetchLessonStatus() {
+  const rows = await authFetch('/me/lesson-status')
   return Object.fromEntries(
     rows.map((r) => [r.lesson_id, { completed: r.completed, bestScorePct: r.best_score_pct }])
   )
@@ -141,12 +97,12 @@ export async function fetchLessonStatus(profileId) {
 /**
  * Build the POST /attempts body from a finished, evaluated session.
  * Exactly one of lessonId / topicId must be set (curriculum vs ad-hoc).
+ * No profile id: the server saves it for the signed-in child.
  *
- * @param {{profileId: string, lessonId?: string|null, topicId?: string|null, questions: Question[], evaluationResult: EvaluationResult}} args
+ * @param {{lessonId?: string|null, topicId?: string|null, questions: Question[], evaluationResult: EvaluationResult}} args
  */
-export function buildAttemptPayload({ profileId, lessonId, topicId, questions, evaluationResult }) {
+export function buildAttemptPayload({ lessonId, topicId, questions, evaluationResult }) {
   return {
-    profile_id: profileId,
     mode: lessonId ? 'curriculum' : 'adhoc',
     lesson_id: lessonId || null,
     topic_id: lessonId ? null : topicId,
@@ -174,7 +130,7 @@ export function buildAttemptPayload({ profileId, lessonId, topicId, questions, e
  * @returns {Promise<{attempt_id: string, score_pct: number, mastered: boolean, lesson: {lesson_id: string, completed: boolean, best_score_pct: number}|null}>}
  */
 export async function saveAttempt(payload) {
-  return postJson('/attempts', payload)
+  return authFetch('/attempts', { method: 'POST', body: payload })
 }
 
 /**
@@ -233,7 +189,7 @@ export async function evaluateAnswers(questions, answers) {
       content: a.content,
     })),
   }
-  const raw = await postJson('/answers/evaluate', payload)
+  const raw = await authFetch('/answers/evaluate', { method: 'POST', body: payload })
   // Normalise snake_case response to camelCase for frontend
   return {
     results: raw.results.map((r) => ({
@@ -252,4 +208,58 @@ export async function evaluateAnswers(questions, answers) {
       ])
     ),
   }
+}
+
+// --- Parent area (signed-in parent; the access token comes from lib/auth.js) -------
+
+/** Add a child: a name and a grade ('6' | '7'). */
+export function addChild({ displayName, grade }) {
+  return authFetch('/children', { method: 'POST', body: { display_name: displayName, grade } })
+}
+
+/** Rename a child and/or change their grade. Only the fields given are sent. */
+export function updateChild(childId, { displayName, grade } = {}) {
+  const body = {}
+  if (displayName !== undefined) body.display_name = displayName
+  if (grade !== undefined) body.grade = grade
+  return authFetch(`/children/${encodeURIComponent(childId)}`, { method: 'PATCH', body })
+}
+
+/** A one-time code (10 minutes) for linking a child's device: { code, expiresAt }. */
+export async function createLinkCode(childId) {
+  const data = await authFetch(`/children/${encodeURIComponent(childId)}/link-codes`, { method: 'POST' })
+  return { code: data.code, expiresAt: data.expires_at }
+}
+
+/** Stop a child's unused code from working (the parent closed the code panel). */
+export function cancelLinkCode(childId) {
+  return authFetch(`/children/${encodeURIComponent(childId)}/link-codes`, { method: 'DELETE' })
+}
+
+/** The parent's children, each with `linked_devices` (how many devices are signed in as them). */
+export function listChildren() {
+  return authFetch('/children')
+}
+
+function toDevice(raw) {
+  return { id: raw.session_id, name: raw.device_name, createdAt: raw.created_at, lastUsedAt: raw.last_used_at }
+}
+
+/** Devices signed in as this child: [{ id, name, createdAt, lastUsedAt }]. */
+export async function listDevices(childId) {
+  const data = await authFetch(`/children/${encodeURIComponent(childId)}/devices`)
+  return data.map(toDevice)
+}
+
+export async function renameDevice(deviceId, name) {
+  const data = await authFetch(`/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'PATCH',
+    body: { device_name: name },
+  })
+  return toDevice(data)
+}
+
+/** Sign the device out. It goes back to the start screen at its next check. */
+export function unlinkDevice(deviceId) {
+  return authFetch(`/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' })
 }

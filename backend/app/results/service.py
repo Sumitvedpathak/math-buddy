@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.curriculum.service import UnknownLessonError, get_lesson
-from app.profiles.service import require_profile
 from app.results.models import LessonProgress, PracticeAttempt
 from app.results.schemas import AttemptCreate
 
@@ -27,17 +26,16 @@ def is_mastered(score_pct: float) -> bool:
 
 
 async def save_attempt(
-    session: AsyncSession, data: AttemptCreate
+    session: AsyncSession, profile_id: uuid.UUID, data: AttemptCreate
 ) -> tuple[PracticeAttempt, float, LessonProgress | None]:
     """Persist one attempt; for curriculum mode also upsert lesson_progress."""
-    await require_profile(session, data.profile_id)  # raises ProfileNotFoundError
     if data.mode == "curriculum" and get_lesson(data.lesson_id) is None:
         raise UnknownLessonError(data.lesson_id)
 
     now = datetime.now(timezone.utc)
     pct = compute_score_pct(data.score, data.max_score)
     attempt = PracticeAttempt(
-        profile_id=data.profile_id,
+        profile_id=profile_id,
         mode=data.mode,
         lesson_id=data.lesson_id,
         topic_id=data.topic_id,
@@ -54,13 +52,13 @@ async def save_attempt(
     if data.mode == "curriculum":
         progress = await session.scalar(
             select(LessonProgress).where(
-                LessonProgress.profile_id == data.profile_id,
+                LessonProgress.profile_id == profile_id,
                 LessonProgress.lesson_id == data.lesson_id,
             )
         )
         if progress is None:
             progress = LessonProgress(
-                profile_id=data.profile_id,
+                profile_id=profile_id,
                 lesson_id=data.lesson_id,
                 best_score_pct=pct,
                 attempts_count=1,
@@ -79,7 +77,7 @@ async def save_attempt(
     logger.info(
         "Attempt saved",
         extra={
-            "profile_id": str(data.profile_id),
+            "profile_id": str(profile_id),
             "mode": data.mode,
             "lesson_id": data.lesson_id,
             "score_pct": pct,

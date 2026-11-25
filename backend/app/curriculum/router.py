@@ -1,10 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.deps import require_signed_in
 from app.curriculum.schemas import CurriculumResponse
 from app.curriculum.service import get_curriculum
 from app.profiles.schemas import Grade
 
-router = APIRouter(tags=["curriculum"])
+# Any signed-in parent or child.
+router = APIRouter(tags=["curriculum"], dependencies=[Depends(require_signed_in)])
 
 
 @router.get("/curriculum", response_model=CurriculumResponse)

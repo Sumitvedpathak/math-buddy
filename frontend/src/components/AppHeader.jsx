@@ -9,7 +9,7 @@ const NAV_LINKS = [
 ]
 
 export default function AppHeader() {
-  const { state, navigateTo, switchProfile } = useSession()
+  const { state, navigateTo } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const profile = state.profile
 
@@ -75,19 +75,12 @@ export default function AppHeader() {
           })}
         </nav>
 
-        {/* Active profile + switcher (e.g. a sibling sharing the device) */}
+        {/* Who is signed in on this device. A parent unlinks it from /parent. */}
         {profile && (
           <div className="hidden md:flex items-center gap-2 text-sm text-ink-soft">
             <span>
               {profile.displayName} · Grade {profile.grade}
             </span>
-            <button
-              type="button"
-              onClick={switchProfile}
-              className="rounded-full border border-border px-3 py-1 text-xs hover:bg-surface-elevated hover:text-ink"
-            >
-              Switch profile
-            </button>
           </div>
         )}
 
@@ -141,13 +134,9 @@ export default function AppHeader() {
             )
           })}
           {profile && (
-            <button
-              type="button"
-              onClick={() => { switchProfile(); setMenuOpen(false) }}
-              className="flex w-full items-center rounded-md px-4 py-3 text-sm text-ink-soft hover:bg-surface-elevated hover:text-ink"
-            >
-              Switch profile ({profile.displayName})
-            </button>
+            <p className="px-4 py-3 text-sm text-ink-soft">
+              {profile.displayName} · Grade {profile.grade}
+            </p>
           )}
           <button
             type="button"

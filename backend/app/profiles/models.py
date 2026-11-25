@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Text,
     UniqueConstraint,
     Uuid,
@@ -24,7 +25,12 @@ class Profile(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(Text, nullable=False)
+    # Owning parent. NULL only for profiles made before parent sign-in, not yet claimed.
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("parents.id"), nullable=True, index=True
+    )
+    # Only the old email sign-in has one; children added by a parent have no email.
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     grade: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

@@ -1,15 +1,16 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import {
   generateQuestions,
   evaluateAnswers,
-  lookupProfile,
-  createProfile,
   fetchCurriculum,
   fetchLessonStatus,
   buildAttemptPayload,
   saveAttemptWithRetry,
+  toProfile,
 } from '../lib/api'
 import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
+import { linkDevice, onSignedOut, refreshSession } from '../lib/auth'
+import { openParentArea } from '../lib/navigation'
 
 /**
  * @typedef {import('../lib/api').Question} Question
@@ -19,7 +20,7 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  */
 
 /**
- * @typedef {"profile"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"|"writingCoach"} AppScreen
+ * @typedef {"start"|"home"|"lesson"|"loading"|"practice"|"evaluating"|"dashboard"|"leaderboard"|"about"|"writingCoach"} AppScreen
  */
 
 /**
@@ -33,8 +34,9 @@ import FALLBACK_FUN_FACTS from '../lib/fallbackFacts'
  * @property {Record<string, Answer>} answers
  * @property {EvaluationResult|null} evaluationResult
  * @property {{message: string, retryFn: () => void}|null} error
- * @property {Profile|null} profile - the loaded child profile (identity only is cached in localStorage)
+ * @property {Profile|null} profile - the signed-in child (from the server; nothing is kept in localStorage)
  * @property {"none"|"loading"|"ready"} profileStatus
+ * @property {boolean} signedOut - this device was signed out while in use (e.g. unlinked by a parent)
  * @property {AppScreen|null} pendingScreen - where to go once a profile has been loaded
  * @property {Array} curriculum - units for the profile's grade (empty for grade 6)
  * @property {Record<string, {completed: boolean, bestScorePct: number}>} lessonStatus
@@ -49,34 +51,14 @@ export const CURRICULUM_QUESTION_COUNT = 25
 /** profiles.grade maps 1:1 onto the existing question-generation age groups. */
 const GRADE_TO_AGE_GROUP = { 6: '9-10', 7: '11-12' }
 
-const PROFILE_STORAGE_KEY = 'mathBuddy.profile'
+/** The old email sign-in kept { profileId, email } here. It is no longer used. */
+const OLD_PROFILE_STORAGE_KEY = 'mathBuddy.profile'
 
-/** Identity only ({ profileId, email }) — never progress data. */
-function readCachedIdentity() {
+function forgetOldEmailSignIn() {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PROFILE_STORAGE_KEY))
-    return parsed?.profileId && parsed?.email ? parsed : null
+    window.localStorage.removeItem(OLD_PROFILE_STORAGE_KEY)
   } catch {
-    return null
-  }
-}
-
-function writeCachedIdentity(profile) {
-  try {
-    window.localStorage.setItem(
-      PROFILE_STORAGE_KEY,
-      JSON.stringify({ profileId: profile.id, email: profile.email })
-    )
-  } catch {
-    // storage unavailable (private window etc.) — the app still works, just re-asks next visit
-  }
-}
-
-function clearCachedIdentity() {
-  try {
-    window.localStorage.removeItem(PROFILE_STORAGE_KEY)
-  } catch {
-    // ignore
+    // storage unavailable: nothing to forget
   }
 }
 
@@ -115,6 +97,7 @@ const INITIAL_STATE = {
   error: null,
   profile: null,
   profileStatus: 'none',
+  signedOut: false,
   pendingScreen: null,
   curriculum: [],
   lessonStatus: {},
@@ -140,16 +123,13 @@ function carryOver(s) {
  * @param {{ children: React.ReactNode }} props
  */
 export function SessionProvider({ children }) {
-  const cachedIdentityRef = useRef(undefined)
-  if (cachedIdentityRef.current === undefined) {
-    cachedIdentityRef.current = readCachedIdentity()
-  }
-
-  const [state, setState] = useState(() =>
-    cachedIdentityRef.current
-      ? { ...INITIAL_STATE, profileStatus: 'loading', screen: readWritingCoachOpen() ? 'writingCoach' : 'home' }
-      : { ...INITIAL_STATE, screen: 'profile' }
-  )
+  // 'loading' first: the server is asked whether this browser is a linked child device.
+  // The screen is where a reload should land if it is (home, or Writing Coach if open).
+  const [state, setState] = useState(() => ({
+    ...INITIAL_STATE,
+    profileStatus: 'loading',
+    screen: readWritingCoachOpen() ? 'writingCoach' : 'home',
+  }))
 
   useEffect(() => {
     writeWritingCoachOpen(state.screen === 'writingCoach')
@@ -184,15 +164,9 @@ export function SessionProvider({ children }) {
 
   /* ── Profiles ── */
 
-  /** Read-only existence check. Resolves to a Profile or null; never creates. */
-  const findProfile = useCallback((email) => lookupProfile(email), [])
-
-  /** Create a profile — callers must only do this after explicit user confirmation. */
-  const registerProfile = useCallback((input) => createProfile(input), [])
-
-  const refreshLessonStatus = useCallback(async (profileId) => {
+  const refreshLessonStatus = useCallback(async () => {
     try {
-      const lessonStatus = await fetchLessonStatus(profileId)
+      const lessonStatus = await fetchLessonStatus()
       setState((s) => ({ ...s, lessonStatus }))
     } catch (err) {
       console.warn('[refreshLessonStatus] failed', err)
@@ -200,18 +174,17 @@ export function SessionProvider({ children }) {
   }, [])
 
   /**
-   * Make `profile` the active one: load its curriculum + lesson status, cache its
-   * identity, and set the age group from its grade. Throws if the curriculum can't load.
+   * Make `profile` (the signed-in child) the active one: load its curriculum + lesson
+   * status and set the age group from its grade. Throws if the curriculum can't load.
    */
   const enterProfile = useCallback(async (profile, { keepScreen = false } = {}) => {
     const [curriculum, lessonStatus] = await Promise.all([
       fetchCurriculum(profile.grade),
-      fetchLessonStatus(profile.id).catch((err) => {
+      fetchLessonStatus().catch((err) => {
         console.warn('[enterProfile] lesson status unavailable', err)
         return {}
       }),
     ])
-    writeCachedIdentity(profile)
     setState((s) => ({
       ...s,
       profile,
@@ -220,44 +193,47 @@ export function SessionProvider({ children }) {
       curriculum,
       lessonStatus,
       error: null,
+      signedOut: false,
       screen: keepScreen ? s.screen : s.pendingScreen || 'home',
       pendingScreen: null,
     }))
   }, [])
 
-  /** Forget the active profile (e.g. a sibling using the same device). */
-  const switchProfile = useCallback(() => {
-    clearCachedIdentity()
-    setState({ ...INITIAL_STATE, screen: 'profile' })
-  }, [])
+  /** A child's device: use the one-time code from a parent, then enter that child's profile. */
+  const linkWithCode = useCallback(async (code) => {
+    const me = await linkDevice(code)
+    await enterProfile(toProfile(me.profile))
+  }, [enterProfile])
 
-  // Auto-resume the cached profile on the same browser.
+  // On start: ask the server who this browser is signed in as (refresh cookie).
+  // A linked child: enter that child. A parent: the parent area. Nobody: the start screen.
   useEffect(() => {
-    const cached = cachedIdentityRef.current
-    if (!cached) return undefined
     let cancelled = false
+    forgetOldEmailSignIn()
 
     async function resume() {
+      const me = await refreshSession().catch(() => null)
+      if (cancelled) return
+      if (me?.kind === 'parent') {
+        openParentArea() // stays 'loading' until the page changes
+        return
+      }
+      if (me?.kind !== 'child') {
+        setState((s) => ({ ...s, profileStatus: 'none', screen: 'start' }))
+        return
+      }
       try {
-        const profile = await lookupProfile(cached.email)
-        if (cancelled) return
-        if (!profile) {
-          clearCachedIdentity()
-          setState((s) => ({ ...s, profileStatus: 'none', screen: 'profile' }))
-          return
-        }
-        await enterProfile(profile, { keepScreen: true })
+        await enterProfile(toProfile(me.profile), { keepScreen: true })
       } catch (err) {
         if (cancelled) return
-        console.error('[resumeProfile] error:', err)
+        console.error('[resumeLinkedChild] error:', err)
         setState((s) => ({
           ...s,
           profileStatus: 'none',
-          screen: 'profile',
           error: {
             message: 'Could not load your profile. Please check your connection and try again.',
             retryFn: () => {
-              setState((cur) => ({ ...cur, error: null, profileStatus: 'loading', screen: 'home' }))
+              setState((cur) => ({ ...cur, error: null, profileStatus: 'loading' }))
               resume()
             },
           },
@@ -270,6 +246,18 @@ export function SessionProvider({ children }) {
       cancelled = true
     }
   }, [enterProfile])
+
+  // Signed out while in use (a parent unlinked this device, or it expired): back to the
+  // start screen. Everything about the child is dropped from memory.
+  useEffect(
+    () =>
+      onSignedOut(() => {
+        setState((s) =>
+          s.profile ? { ...INITIAL_STATE, profileStatus: 'none', screen: 'start', signedOut: true } : s
+        )
+      }),
+    []
+  )
 
   /* ── Sessions ── */
 
@@ -352,7 +340,6 @@ export function SessionProvider({ children }) {
   const persistAttempt = useCallback(async (result) => {
     if (!state.profile) return
     const payload = buildAttemptPayload({
-      profileId: state.profile.id,
       lessonId: state.lessonId,
       topicId: [...state.selectedTopics].sort().join('+') || 'adhoc',
       questions: state.questions,
@@ -361,7 +348,7 @@ export function SessionProvider({ children }) {
     setState((s) => ({ ...s, saveStatus: 'saving' }))
     const saved = await saveAttemptWithRetry(payload)
     setState((s) => ({ ...s, saveStatus: saved ? 'saved' : 'failed' }))
-    if (saved) refreshLessonStatus(state.profile.id)
+    if (saved) refreshLessonStatus()
   }, [state.profile, state.lessonId, state.selectedTopics, state.questions, refreshLessonStatus])
 
   const submitAnswers = useCallback(async (exportedAnswers) => {
@@ -408,7 +395,7 @@ export function SessionProvider({ children }) {
   const navigateTo = useCallback((screen) => {
     setState((s) =>
       screen === 'practice' && !s.profile
-        ? { ...s, screen: 'profile', pendingScreen: 'practice' }
+        ? { ...s, screen: 'start', pendingScreen: 'practice' }
         : { ...s, screen }
     )
   }, [])
@@ -425,10 +412,8 @@ export function SessionProvider({ children }) {
     resetSession,
     goHome,
     navigateTo,
-    findProfile,
-    registerProfile,
     enterProfile,
-    switchProfile,
+    linkWithCode,
   }
 
   return (

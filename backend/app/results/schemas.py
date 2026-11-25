@@ -15,7 +15,7 @@ class LessonStatus(BaseModel):
 
 
 class AttemptCreate(BaseModel):
-    profile_id: uuid.UUID
+    # No profile_id: the child is taken from the access token.
     mode: Literal["curriculum", "adhoc"]
     lesson_id: str | None = None  # required iff mode == "curriculum"
     topic_id: str | None = None  # required iff mode == "adhoc"

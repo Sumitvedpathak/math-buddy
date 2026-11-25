@@ -5,9 +5,15 @@ import { SessionProvider, useSession } from './SessionContext'
 
 vi.mock('../lib/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  lookupProfile: vi.fn().mockResolvedValue({ id: 'p1', email: 'k@e.co', displayName: 'Sam', grade: '7' }),
   fetchCurriculum: vi.fn().mockResolvedValue([]),
   fetchLessonStatus: vi.fn().mockResolvedValue({}),
+}))
+
+// This browser is linked to a grade 7 child.
+vi.mock('../lib/auth', () => ({
+  refreshSession: vi.fn().mockResolvedValue({ kind: 'child', profile: { id: 'c1', display_name: 'Sam', grade: '7' } }),
+  linkDevice: vi.fn(),
+  onSignedOut: vi.fn(() => () => {}),
 }))
 
 const FLAG = 'mathBuddy.wc.open'
@@ -32,7 +38,6 @@ function renderProvider() {
 beforeEach(() => {
   window.localStorage.clear()
   window.sessionStorage.clear()
-  window.localStorage.setItem('mathBuddy.profile', JSON.stringify({ profileId: 'p1', email: 'k@e.co' }))
 })
 
 describe('refreshing while on Writing Coach', () => {

@@ -3,17 +3,28 @@
 import pytest
 
 from tests.integration.test_attempts_api import adhoc_attempt, curriculum_attempt
+from tests.kids import make_kid
 
 GHOST = "00000000-0000-4000-8000-000000000000"
 
 
 @pytest.fixture
-async def profile_id(client):
-    resp = await client.post(
-        "/api/v1/profiles",
-        json={"email": "kid@example.com", "display_name": "Sam", "grade": "7"},
-    )
-    return resp.json()["id"]
+async def kid(client):
+    return await make_kid(client, name="Sam")
+
+
+@pytest.fixture
+def profile_id(kid):
+    return kid.id
+
+
+@pytest.fixture
+def save(client, kid):
+    async def post(body):
+        resp = await client.post("/api/v1/attempts", json=body, headers=kid.headers)
+        assert resp.status_code == 201, resp.text
+
+    return post
 
 
 def admin_paths(pid):
@@ -47,9 +58,9 @@ async def test_bad_token_beats_input_validation(client, admin_token):
 
 
 async def test_unconfigured_server_token_denies_everyone(client, monkeypatch, profile_id):
-    from types import SimpleNamespace
+    from app.core.config import get_settings
 
-    monkeypatch.setattr("app.core.deps.get_settings", lambda: SimpleNamespace(admin_token=None))
+    monkeypatch.setattr(get_settings(), "admin_token", None)
     for token in (None, "", "anything"):
         headers = {"X-Admin-Token": token} if token is not None else {}
         assert (await client.get("/api/v1/admin/profiles", headers=headers)).status_code == 404
@@ -60,23 +71,24 @@ async def test_admin_not_in_openapi(client):
     assert not any("/admin" in p for p in schema["paths"])
 
 
-async def test_profile_list_with_activity(client, admin_token, profile_id):
+async def test_profile_list_with_activity(client, admin_token, profile_id, save):
     h = {"X-Admin-Token": admin_token}
     before = (await client.get("/api/v1/admin/profiles", headers=h)).json()
     assert before[0]["attempt_count"] == 0 and before[0]["last_attempt_at"] is None
 
-    await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 20))
-    await client.post("/api/v1/attempts", json=adhoc_attempt(profile_id))
+    await save(curriculum_attempt(20))
+    await save(adhoc_attempt())
     after = (await client.get("/api/v1/admin/profiles", headers=h)).json()
     assert after[0]["attempt_count"] == 2
     assert after[0]["last_attempt_at"] is not None
-    assert after[0]["email"] == "kid@example.com"
+    assert after[0]["display_name"] == "Sam"
+    assert after[0]["email"] is None  # children added by a parent have no email
 
 
-async def test_attempt_history_and_detail(client, admin_token, profile_id):
+async def test_attempt_history_and_detail(client, admin_token, profile_id, save):
     h = {"X-Admin-Token": admin_token}
-    await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 20))
-    await client.post("/api/v1/attempts", json=adhoc_attempt(profile_id, 18, 20))
+    await save(curriculum_attempt(20))
+    await save(adhoc_attempt(18, 20))
 
     attempts = (await client.get(f"/api/v1/admin/profiles/{profile_id}/attempts", headers=h)).json()
     assert [a["mode"] for a in attempts] == ["adhoc", "curriculum"]  # newest first
@@ -97,11 +109,11 @@ async def test_attempt_history_and_detail(client, admin_token, profile_id):
     assert wrong_profile.status_code == 404
 
 
-async def test_daily_progress_groups_by_day(client, admin_token, profile_id):
+async def test_daily_progress_groups_by_day(client, admin_token, profile_id, save):
     h = {"X-Admin-Token": admin_token}
-    await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 20))  # 80
-    await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 24))  # 96
-    await client.post("/api/v1/attempts", json=adhoc_attempt(profile_id, 10, 20))  # 50
+    await save(curriculum_attempt(20))  # 80
+    await save(curriculum_attempt(24))  # 96
+    await save(adhoc_attempt(10, 20))  # 50
 
     days = (await client.get(f"/api/v1/admin/profiles/{profile_id}/progress/daily", headers=h)).json()
     assert len(days) == 1  # all three attempts happened today
@@ -112,9 +124,9 @@ async def test_daily_progress_groups_by_day(client, admin_token, profile_id):
     assert day["avg_score_pct"] == 75.33
 
 
-async def test_lesson_progress_covers_every_lesson(client, admin_token, profile_id):
+async def test_lesson_progress_covers_every_lesson(client, admin_token, profile_id, save):
     h = {"X-Admin-Token": admin_token}
-    await client.post("/api/v1/attempts", json=curriculum_attempt(profile_id, 24, lesson_id="2.1"))
+    await save(curriculum_attempt(24, lesson_id="2.1"))
     rows = (await client.get(f"/api/v1/admin/profiles/{profile_id}/lesson-progress", headers=h)).json()
     assert len(rows) == 58
     by_id = {r["lesson_id"]: r for r in rows}

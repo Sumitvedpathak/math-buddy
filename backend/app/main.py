@@ -6,12 +6,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.account.router import router as account_router
 from app.admin.router import router as admin_router
 from app.core.config import get_settings
 from app.core.logging_config import configure_logging, request_id_ctx
 from app.curriculum.router import router as curriculum_router
 from app.practice.router import router as practice_router
-from app.profiles.router import router as profiles_router
 from app.results.router import router as results_router
 from app.writing_coach.router import router as writing_coach_router
 
@@ -33,10 +33,10 @@ app.add_middleware(
 
 # One router per feature. Each feature folder holds its routes, logic, schemas and tables.
 for feature_router in (
-    profiles_router,       # /profiles             app/profiles/
+    account_router,        # /auth/*, /me, /children, /devices  app/account/
     curriculum_router,     # /curriculum           app/curriculum/
     practice_router,       # /questions, /answers  app/practice/
-    results_router,        # /attempts, lesson-status  app/results/
+    results_router,        # /attempts, /me/lesson-status  app/results/
     admin_router,          # /admin/*              app/admin/
     writing_coach_router,  # /wc/*                 app/writing_coach/
 ):

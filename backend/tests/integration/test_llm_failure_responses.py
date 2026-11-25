@@ -8,6 +8,7 @@ from openai import RateLimitError
 
 from app.core import llm as router
 from app.core.llm import BUSY_MESSAGE, LLMServiceError
+from tests.kids import CHILD
 
 GENERATE = {"topics": ["Geometry"], "age_group": "11-12", "question_count": 5, "lesson_id": "7.1"}
 EVALUATE = {
@@ -26,14 +27,14 @@ def _rate_limited_model():
 
 async def test_generate_rate_limit_is_a_503_with_a_friendly_message(client):
     with patch.object(router, "_get_model", return_value=_rate_limited_model()):
-        resp = await client.post("/api/v1/questions/generate", json=GENERATE)
+        resp = await client.post("/api/v1/questions/generate", json=GENERATE, headers=CHILD())
     assert resp.status_code == 503
     assert resp.json()["detail"] == BUSY_MESSAGE
 
 
 async def test_evaluate_rate_limit_is_a_503_with_a_friendly_message(client):
     with patch.object(router, "_get_model", return_value=_rate_limited_model()):
-        resp = await client.post("/api/v1/answers/evaluate", json=EVALUATE)
+        resp = await client.post("/api/v1/answers/evaluate", json=EVALUATE, headers=CHILD())
     assert resp.status_code == 503
     assert resp.json()["detail"] == BUSY_MESSAGE
 
@@ -43,7 +44,7 @@ async def test_generate_service_error_message_is_passed_through(client):
         "app.practice.question_service.call_llm",
         new=AsyncMock(side_effect=LLMServiceError("busy right now")),
     ):
-        resp = await client.post("/api/v1/questions/generate", json=GENERATE)
+        resp = await client.post("/api/v1/questions/generate", json=GENERATE, headers=CHILD())
     assert resp.status_code == 503
     assert resp.json()["detail"] == "busy right now"
 
@@ -51,6 +52,6 @@ async def test_generate_service_error_message_is_passed_through(client):
 async def test_evaluate_garbled_model_reply_is_a_503(client):
     garbled = SimpleNamespace(ainvoke=AsyncMock(return_value=SimpleNamespace(content="not json")))
     with patch.object(router, "_get_model", return_value=garbled):
-        resp = await client.post("/api/v1/answers/evaluate", json=EVALUATE)
+        resp = await client.post("/api/v1/answers/evaluate", json=EVALUATE, headers=CHILD())
     assert resp.status_code == 503
     assert "garbled" in resp.json()["detail"]

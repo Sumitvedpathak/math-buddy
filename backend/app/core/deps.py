@@ -2,12 +2,74 @@ import hmac
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.account.tokens import InvalidAccessToken, TokenClaims, verify_access_token
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.profiles.models import Profile
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_signed_in(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> TokenClaims:
+    """Any valid Math Buddy access token (`Authorization: Bearer ...`), parent or child."""
+    secret = get_settings().jwt_secret
+    if credentials is None or not secret:
+        raise _not_signed_in()
+    try:
+        return verify_access_token(secret, credentials.credentials)
+    except InvalidAccessToken as exc:
+        raise _not_signed_in() from exc
+
+
+def _not_signed_in() -> HTTPException:
+    return HTTPException(
+        status_code=401, detail="Not signed in", headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+SignedInDep = Annotated[TokenClaims, Depends(require_signed_in)]
+
+
+async def require_parent(claims: SignedInDep) -> TokenClaims:
+    """A parent's access token. A child's token gets 403."""
+    if claims.kind != "parent":
+        raise HTTPException(status_code=403, detail="Parents only")
+    return claims
+
+
+ParentDep = Annotated[TokenClaims, Depends(require_parent)]
+
+
+async def require_child(claims: SignedInDep) -> TokenClaims:
+    """A linked child device's access token. A parent's token gets 403."""
+    if claims.kind != "child":
+        raise HTTPException(status_code=403, detail="Children only")
+    return claims
+
+
+ChildDep = Annotated[TokenClaims, Depends(require_child)]
+
+
+async def current_child(claims: ChildDep, session: SessionDep) -> Profile:
+    """The child's profile, always from the token (never from the request).
+
+    A child that no longer exists, or no longer belongs to the parent who linked
+    the device, is treated as signed out (401).
+    """
+    child = await session.get(Profile, claims.sub)
+    if child is None or child.parent_id != claims.pid:
+        raise _not_signed_in()
+    return child
+
+
+ChildProfileDep = Annotated[Profile, Depends(current_child)]
 
 
 async def require_admin(

@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   generateQuestions,
-  lookupProfile,
-  createProfile,
+  fetchCurriculum,
   fetchLessonStatus,
   buildAttemptPayload,
   saveAttemptWithRetry,
   adminGet,
+  addChild,
+  updateChild,
+  createLinkCode,
+  cancelLinkCode,
+  listChildren,
+  listDevices,
+  renameDevice,
+  unlinkDevice,
+  toProfile,
 } from './api'
+import { linkDevice, resetAuthForTests } from './auth'
 
 function jsonResponse(body, status = 200) {
   return {
@@ -28,6 +37,7 @@ const EVALUATION = {
 }
 
 beforeEach(() => {
+  resetAuthForTests()
   vi.stubGlobal('fetch', vi.fn())
 })
 afterEach(() => {
@@ -66,46 +76,45 @@ describe('API errors', () => {
   })
 })
 
-describe('profiles', () => {
-  it('lookupProfile returns null when nothing exists and never POSTs', async () => {
-    fetch.mockResolvedValue(jsonResponse({ exists: false, profile: null }))
-    expect(await lookupProfile('new@example.com')).toBeNull()
-    expect(fetch.mock.calls[0][0]).toContain('/profiles/lookup?email=new%40example.com')
-    expect(fetch.mock.calls[0][1].method).toBeUndefined()
-  })
-
-  it('lookupProfile maps the profile to camelCase', async () => {
-    fetch.mockResolvedValue(jsonResponse({
-      exists: true,
-      profile: { id: 'p1', email: 'a@b.co', display_name: 'Sam', grade: '7', created_at: 'x' },
+describe('child calls use the sign-in', () => {
+  async function linkThisBrowser() {
+    fetch.mockResolvedValueOnce(jsonResponse({
+      access_token: 'child-token', expires_in: 900,
+      me: { kind: 'child', profile: { id: 'c1', display_name: 'Aarav', grade: '7' } },
     }))
-    expect(await lookupProfile('a@b.co')).toEqual({ id: 'p1', email: 'a@b.co', displayName: 'Sam', grade: '7' })
+    await linkDevice('7K4Q-9PXM')
+  }
+
+  it.each([
+    ['generateQuestions', () => generateQuestions(['Algebra'], '11-12', 30), { questions: [], fun_facts: [] }],
+    ['fetchCurriculum', () => fetchCurriculum('7'), { units: [] }],
+    ['fetchLessonStatus', () => fetchLessonStatus(), []],
+    ['saveAttempt', () => saveAttemptWithRetry({ mode: 'adhoc' }, { delayMs: 0 }), { attempt_id: 'a1' }],
+  ])('%s sends the access token', async (_name, call, reply) => {
+    await linkThisBrowser()
+    fetch.mockResolvedValueOnce(jsonResponse(reply))
+    await call()
+    expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer child-token')
   })
 
-  it('createProfile POSTs snake_case fields', async () => {
-    fetch.mockResolvedValue(jsonResponse(
-      { id: 'p1', email: 'a@b.co', display_name: 'Sam', grade: '6', created_at: 'x' }, 201))
-    const profile = await createProfile({ email: 'a@b.co', displayName: 'Sam', grade: '6' })
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: 'a@b.co', display_name: 'Sam', grade: '6' })
-    expect(profile.displayName).toBe('Sam')
-  })
-
-  it('fetchLessonStatus keys rows by lesson id', async () => {
+  it('fetchLessonStatus reads the signed-in child and keys rows by lesson id', async () => {
     fetch.mockResolvedValue(jsonResponse([
       { lesson_id: '10.3', completed: true, best_score_pct: 96 },
     ]))
-    expect(await fetchLessonStatus('p1')).toEqual({ '10.3': { completed: true, bestScorePct: 96 } })
+    expect(await fetchLessonStatus()).toEqual({ '10.3': { completed: true, bestScorePct: 96 } })
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/me/lesson-status')
   })
 })
 
 describe('buildAttemptPayload', () => {
   it('builds a curriculum attempt with no topic', () => {
     const p = buildAttemptPayload({
-      profileId: 'p1', lessonId: '10.3', topicId: 'ignored', questions: QUESTIONS, evaluationResult: EVALUATION,
+      lessonId: '10.3', topicId: 'ignored', questions: QUESTIONS, evaluationResult: EVALUATION,
     })
     expect(p).toMatchObject({
-      profile_id: 'p1', mode: 'curriculum', lesson_id: '10.3', topic_id: null, score: 2, max_score: 2,
+      mode: 'curriculum', lesson_id: '10.3', topic_id: null, score: 2, max_score: 2,
     })
+    expect(p).not.toHaveProperty('profile_id') // the server takes the child from the sign-in
     expect(p.questions[0]).toEqual({
       id: 'q1', topic: 'Variables', problem_type: 'lesson', text: '3n + 1', difficulty_tier: 1,
     })
@@ -116,14 +125,14 @@ describe('buildAttemptPayload', () => {
 
   it('builds an ad-hoc attempt with no lesson', () => {
     const p = buildAttemptPayload({
-      profileId: 'p1', lessonId: null, topicId: 'algebra+volumes', questions: QUESTIONS, evaluationResult: EVALUATION,
+      lessonId: null, topicId: 'algebra+volumes', questions: QUESTIONS, evaluationResult: EVALUATION,
     })
     expect(p).toMatchObject({ mode: 'adhoc', lesson_id: null, topic_id: 'algebra+volumes' })
   })
 })
 
 describe('saveAttemptWithRetry', () => {
-  const payload = { profile_id: 'p1' }
+  const payload = { mode: 'adhoc' }
 
   it('saves once when the first try works', async () => {
     fetch.mockResolvedValue(jsonResponse({ attempt_id: 'a1' }, 201))
@@ -155,5 +164,103 @@ describe('adminGet', () => {
 
     fetch.mockResolvedValueOnce(jsonResponse({ detail: 'Not Found' }, 404))
     await expect(adminGet('bad', '/profiles')).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+
+describe('children (parent only)', () => {
+  it('adds a child with a name and a grade', async () => {
+    const child = { id: 'c1', display_name: 'Aarav', grade: '7' }
+    fetch.mockResolvedValue(jsonResponse(child, 201))
+
+    expect(await addChild({ displayName: 'Aarav', grade: '7' })).toEqual(child)
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ display_name: 'Aarav', grade: '7' })
+  })
+
+  it('changes only what is given', async () => {
+    fetch.mockResolvedValue(jsonResponse({ id: 'c1', display_name: 'Aaru', grade: '7' }))
+
+    await updateChild('c1', { displayName: 'Aaru' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ display_name: 'Aaru' })
+  })
+})
+
+
+describe('createLinkCode', () => {
+  it('asks for a code for one child', async () => {
+    fetch.mockResolvedValue(jsonResponse({ code: '7K4Q-9PXM', expires_at: '2026-11-20T10:10:00Z' }, 201))
+
+    expect(await createLinkCode('c1')).toEqual({ code: '7K4Q-9PXM', expiresAt: '2026-11-20T10:10:00Z' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1/link-codes')
+    expect(init.method).toBe('POST')
+  })
+})
+
+describe('toProfile', () => {
+  it('handles a child added by a parent, who has no email', () => {
+    expect(toProfile({ id: 'c1', display_name: 'Aarav', grade: '7' })).toEqual({
+      id: 'c1', email: null, displayName: 'Aarav', grade: '7',
+    })
+  })
+})
+
+
+describe('linked devices (parent only)', () => {
+  it('lists the children with their device counts', async () => {
+    const children = [{ id: 'c1', display_name: 'Aarav', grade: '7', linked_devices: 1 }]
+    fetch.mockResolvedValue(jsonResponse(children))
+    expect(await listChildren()).toEqual(children)
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/children')
+  })
+
+  it('cancels the unused code of one child', async () => {
+    fetch.mockResolvedValue({ ok: true, status: 204, text: async () => '' })
+    await cancelLinkCode('c1')
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/children/c1/link-codes')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it("lists a child's devices", async () => {
+    fetch.mockResolvedValue(
+      jsonResponse([
+        {
+          session_id: 's1',
+          device_name: 'Chrome on Windows',
+          created_at: '2026-11-18T10:00:00Z',
+          last_used_at: '2026-11-20T09:00:00Z',
+        },
+      ])
+    )
+    expect(await listDevices('c1')).toEqual([
+      { id: 's1', name: 'Chrome on Windows', createdAt: '2026-11-18T10:00:00Z', lastUsedAt: '2026-11-20T09:00:00Z' },
+    ])
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/children/c1/devices')
+  })
+
+  it('renames a device', async () => {
+    fetch.mockResolvedValue(
+      jsonResponse({ session_id: 's1', device_name: 'Laptop', created_at: 'a', last_used_at: 'b' })
+    )
+    expect(await renameDevice('s1', 'Laptop')).toEqual({ id: 's1', name: 'Laptop', createdAt: 'a', lastUsedAt: 'b' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/devices/s1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ device_name: 'Laptop' })
+  })
+
+  it('unlinks a device', async () => {
+    fetch.mockResolvedValue({ ok: true, status: 204, text: async () => '' })
+    await unlinkDevice('s1')
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/devices/s1')
+    expect(init.method).toBe('DELETE')
   })
 })

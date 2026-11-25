@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Math Buddy** is an AI-powered math practice app for children (ages 9–12). Students select topics and age groups, answer questions via sketch or typed text, and receive instant AI-marked feedback with a results dashboard. Session state (questions, answers, results) lives in React Context and is cleared on tab close. Since the grade 7 curriculum work (Oct 2026), child **profiles, attempts and lesson progress persist in Postgres** — see "Grade 7 Curriculum Tracking" below. Postgres is optional: without `MATH_BUDDY_DATABASE_URL` the question/evaluate endpoints still work and the rest return 503.
+**Math Buddy** is an AI-powered math practice app for children (ages 9–12). Students select topics and age groups, answer questions via sketch or typed text, and receive instant AI-marked feedback with a results dashboard. Session state (questions, answers, results) lives in React Context and is cleared on tab close. Since the grade 7 curriculum work (Oct 2026), child **profiles, attempts and lesson progress persist in Postgres** — see "Grade 7 Curriculum Tracking" below. Since parent sign-in step 6, every child endpoint needs a sign-in (a linked device), and signing in needs the database, so Postgres is no longer optional in practice.
 
-**Current status**: EduSpark dark design system migration complete (May 2026), deployed to GCP Cloud Run (frontend: `math-buddy-app`, backend: `math-buddy-api`). Grade 7 curriculum tracking (spec: `docs/superpowers/specs/2026-10-20-grade7-curriculum-design.md`) is built on branches `feature/grade7-backend` (Phase 1) and `feature/grade7-frontend` (Phase 2) but **not yet deployed** — Cloud Run still needs a Postgres instance, `MATH_BUDDY_DATABASE_URL` / `MATH_BUDDY_ADMIN_TOKEN` secrets, and `alembic upgrade head`.
+**Current status** (2026-11-24): live on GCP Cloud Run (frontend `math-buddy-app`, backend `math-buddy-api`) with Neon Postgres: grade 7 curriculum tracking, Writing Coach, and parent sign-in with child device linking (`backend:v6`, `frontend:v7`). **Local `backend/.env` points at the production Neon database**, so local testing writes real data.
 
 ---
 
@@ -14,12 +14,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Data**: `profiles`, `lesson_progress` (derived; best score never regresses; `completed` once best ≥ 95%, sticky), `practice_attempts` (append-only history for curriculum *and* free practice). Migrations: `cd backend && alembic upgrade head` (needs `MATH_BUDDY_DATABASE_URL`; local Postgres via `docker compose up db`).
 - **Curriculum**: static `backend/app/curriculum/data/curriculum.json` (all 10 units / 58 lessons, grade 7). Edit the file + redeploy to change it.
-- **Child API**: `GET /profiles/lookup` (read-only), `POST /profiles`, `GET /curriculum`, `POST /attempts`, `GET /profiles/{id}/lesson-status` (no timestamps/history by design). `POST /questions/generate` accepts optional `lesson_id` → lesson-scoped prompt, `problem_type: "lesson"`.
+- **Child API** (child access token; see "Parent sign-in" step 6): `GET /curriculum` (any sign-in), `POST /attempts` (child from the token, no `profile_id` in the body), `GET /me/lesson-status` (no timestamps/history by design). `POST /questions/generate` accepts optional `lesson_id` → lesson-scoped prompt, `problem_type: "lesson"`.
 - **Admin API**: `/api/v1/admin/*`, header `X-Admin-Token` = `MATH_BUDDY_ADMIN_TOKEN` (generate with `python backend/scripts/generate_admin_token.py`). Any auth failure is a generic 404; hidden from `/docs`. Frontend page: `/admin/<token>` (separate route tree in `main.jsx`, never linked from the child app). This is a placeholder for real login — swap only `require_admin` in `backend/app/api/deps.py`.
-- **Frontend flow**: `profile` screen first (email lookup → confirm-before-create → identity-only `localStorage` cache `mathBuddy.profile`) → grade sets `ageGroup` (6→`9-10`, 7→`11-12`) and hides the manual selector. Grade 7 also gets `CurriculumPicker` in the setup stage; lessons are a fixed 25 questions (`CURRICULUM_QUESTION_COUNT`). After evaluation the attempt is saved in the background (`saveAttemptWithRetry`: one retry, then a non-blocking banner). Free-practice attempts store `topic_id` as the sorted selected topic IDs joined with `+`.
+- **Frontend flow**: on start `refreshSession()`; a linked child device enters that child, a parent goes to `/parent`, otherwise the `start` screen → grade sets `ageGroup` (6→`9-10`, 7→`11-12`) and hides the manual selector. Grade 7 also gets `CurriculumPicker` in the setup stage; lessons are a fixed 25 questions (`CURRICULUM_QUESTION_COUNT`). After evaluation the attempt is saved in the background (`saveAttemptWithRetry`: one retry, then a non-blocking banner). Free-practice attempts store `topic_id` as the sorted selected topic IDs joined with `+`.
 - **Lesson read-through (theory)**: choosing a curriculum lesson opens the `lesson` screen (`LessonTheory.jsx`) first — the lesson's own textbook pages, one at a time, ending with "Let's start practice" → `startLesson`. The pages are **images cut from the source PDFs, never LLM-generated**: `uv run --with pymupdf --with pillow python backend/scripts/build_lesson_theory.py` renders the teaching part of each lesson (stops before the textbook's numbered exercises; unit 5 uses a cue-based rule via `CUE_STOP_UNITS`) into `frontend/public/lessons/<id>/<n>.jpg` and writes `theory_pages` into `curriculum.json`. The images are **git-ignored on purpose** (copyrighted textbook content) — regenerate them locally and before building the prod image. If a page image is missing the screen says so and still offers practice. Free-practice topics (Vedic Maths etc.) have no source PDF, so they have no read-through. The dashboard offers "Read the lesson again" after a below-95% attempt.
 
 ---
+
+## Parent sign-in (in progress, branch `feature/account-google-signin`)
+
+Spec: `docs/superpowers/specs/2026-11-15-parent-signin-device-linking-design.md`. Built one step at a time in `backend/app/account/`.
+- **Step 1 (done):** `POST /auth/google {id_token, accepted_terms_version?}` checks the Google ID token (`google-auth`, audience = `MATH_BUDDY_GOOGLE_CLIENT_IDS`, `email_verified` required), finds the parent by Google `sub` or creates one (first time needs `accepted_terms_version` = `MATH_BUDDY_TERMS_VERSION`, else `409 consent_required`), and returns a 15-minute JWT (`MATH_BUDDY_JWT_SECRET`). `GET /me` with `Authorization: Bearer`. Tables `parents`, `auth_identities` (migration `0003`). Tests fake `google.oauth2.id_token.verify_oauth2_token`.
+- **Step 2 (done):** table `auth_sessions` (one row per signed-in device, migration `0004`). Sign-in also starts a session: web gets the refresh token in cookie `mb_refresh` (HttpOnly, Secure, SameSite=Strict, Path=/api/v1/auth), `client:"native"` gets it in the body. `POST /auth/refresh` rotates it (current/prev/older hashes: prev within 30 s = `409 refresh_race`, prev later = lost reply accepted, older = theft, session revoked); idle expiry 60 days (parent), pushed forward on every refresh. `POST /auth/logout` revokes, always 204. Cookie requests also need `X-Requested-With: mathbuddy` and an `Origin` in `CORS_ORIGINS` (else 403). Access tokens carry `sid`.
+- **Frontend for steps 1-2 (done):** page `/parent` (`src/app/parent/ParentApp.jsx`, its own route tree in `main.jsx` like `/admin`), linked from the profile screen. `GoogleButton.jsx` loads Google Identity Services directly (client ID from `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`). `src/lib/auth.js` owns tokens: access token in memory only, one shared refresh per tab (retries once on 409), `authFetch` refreshes and retries once on 401. Needs the Vite `/api` proxy (same origin) for the cookie; production needs the nginx proxy (deploy step).
+- **Step 3 (done, backend + `/parent` page):** `GET/POST /children`, `PATCH /children/{id}` (parent token only, `require_parent`/`ParentDep` in `core/deps.py`; a child token gets 403, another parent's child 404). A child is a `profiles` row with `parent_id` and **no email** (`profiles.email` now nullable, migration `0005`). `/me` and sign-in/refresh replies include `children: [{id, display_name, grade}]`. Frontend: `ChildrenSection.jsx` (list, add, edit), calls `addChild`/`updateChild` in `lib/api.js` via `authFetch`.
+- **Step 4 (done, backend + web):** `POST /children/{id}/link-codes` (parent; 8 chars `XXXX-XXXX` from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, 10 min, single use, a new code cancels the child's earlier unused ones, 20 per parent per hour, only the hash stored in `link_codes`, migration `0006`). `POST /auth/link {code, client, device_name?}` (case/space/dash-insensitive; wrong code = `401 Code not valid`; 10 wrong per IP per 15 min = 429, in-memory `link_failures` in `account/router.py`) starts a child session (idle 180 days; device name from the user agent, e.g. "Chrome on Windows"). Child access token: `sub` = profile id, `pid` = parent. `/me` for a child = `{kind:"child", profile}`. Web: "Link a device" + code panel with countdown in `ChildrenSection.jsx`; kid side `LinkCodeForm.jsx` on the profile screen -> `linkWithCode` in SessionContext. On app start SessionContext calls `refreshSession()`: a child session enters that profile (nothing cached in localStorage; `writeCachedIdentity` skips profiles without email), otherwise the old email cache / profile screen. The old profile endpoints stay open until step 6.
+- **Step 5 (done, backend + web):** `GET /children/{id}/devices` -> `[{session_id, device_name, created_at, last_used_at}]` (child sessions not revoked and not idle-expired), `PATCH /devices/{session_id} {device_name}` (1-60 chars), `DELETE /devices/{session_id}` (unlink = revoke; the device is signed out at its next refresh, its current access token still works for up to 15 min), `DELETE /children/{id}/link-codes` (cancel the unused code). Parent-facing child shapes (`GET/POST /children`, `PATCH`, `/me` children) carry `linked_devices` (a count, not stored); the child's own `/me` does not. Another parent's device or the parent's own session = 404. No migration. Web: each child shows "Not linked yet" / "Linked on N devices", a "Devices" panel (`DevicesPanel.jsx`: rename, unlink with a confirm), the code panel has "Cancel code" and polls `GET /children` every 3 s, closing itself with "<name>'s device is linked." once the count goes up.
+- **Step 6 (done, backend + web):** existing endpoints locked down. `core/deps.py`: `require_child`/`ChildDep` (parent token = 403) and `current_child`/`ChildProfileDep` (the profile from the token; a child that is gone or no longer belongs to the token's parent = 401). Practice router (`generate`/`evaluate`) needs a child token; `GET /curriculum` any sign-in; `POST /attempts` takes the child from the token (`profile_id` removed from `AttemptCreate`); `GET /me/lesson-status` replaces `/profiles/{id}/lesson-status`; Writing Coach student routes use `ChildProfileDep` (grade 7 check kept), not `X-Profile-Id`. Removed: `app/profiles/router.py` (`/profiles/lookup`, `POST /profiles`) and its service/schema code. Old email profiles are given to a parent with `uv run python scripts/assign_profiles_to_parent.py --parent-email <google email> --profile-email <email> ...` (`claim_legacy_profiles` in `account/service.py`; parent must have signed in once; all or nothing; never takes another parent's child). Tests: `tests/kids.py` (`make_kid` = real parent + child + link flow with Google faked; `token_headers`/`CHILD()` = token only). Web: `api.js` child calls go through `authFetch`; `wcApi.js` child calls too (their first `profileId` argument is ignored); `SessionContext` has no email cache (`mathBuddy.profile` is deleted on start), no `findProfile`/`registerProfile`/`switchProfile`; `ProfileScreen` is just the code box + parent link; the header has no "Switch profile". **Deploy backend and frontend together** (the old frontend cannot sign in).
+- **Step 7 (done, web only):** `StartScreen.jsx` (screen `start`, replaces `profile`/`ProfileScreen`): "I'm a kid" (`LinkCodeForm`) and "I'm a parent" (link to `/parent`). On start `SessionContext` calls `refreshSession()`: child -> that child's home, parent -> `openParentArea()` (`lib/navigation.js`, `window.location.assign('/parent')`), nobody -> start screen. `auth.js` `onSignedOut(listener)`: `authFetch` calls it when a 401 survives the refresh (device unlinked/expired); `SessionContext` then drops the child and shows the start screen with "You've been signed out on this device" (`state.signedOut`).
+- **Step 8 (done, 2026-11-24):** deployed. `frontend/nginx.conf.template` proxies `/api/` to `API_UPSTREAM` (Cloud Run env var) so the app and API share one address (needed for the cookie); `Dockerfile.prod` takes `VITE_GOOGLE_CLIENT_ID` (production OAuth client, separate from the local one) and no `VITE_API_URL`. Backend got secret `MATH_BUDDY_JWT_SECRET` and env `MATH_BUDDY_GOOGLE_CLIENT_IDS`. The sons' old profiles were claimed by the family parent account. See `deploy-gcp.md`.
+- **Known limits / later:** delete a child with all their data (deferred by the owner); behind the nginx proxy the backend sees the proxy's address, so the "10 wrong codes per 15 min" limit is shared by everyone (fine for one family, fix before a public launch); an unlinked device keeps working until its 15-minute access token runs out.
 
 ## Writing Coach (temporary; grade 7 son only)
 
@@ -27,7 +41,7 @@ Written-answer practice for Language and History, marked against the Ontario ach
 - **Backend**: `backend/app/writing_coach/` (self-contained). Three agents in `agents.py` (Generator, Reader, Reviewer): Jinja2 prompts in `writing_coach/prompts/`, pydantic schemas, one retry with a repair note. Per-agent models via env `WC_GENERATOR_MODEL`, `WC_READER_MODEL` (must accept images), `WC_REVIEWER_MODEL` (fall back to `MATH_BUDDY_OPENROUTER_MODEL`). Reader temp 0, Reviewer 0.1. `call_llm_with_usage` in `core/llm.py` adds per-call model/temperature + token counts (token counts are logged, never content).
 - **Model answer**: not written by the Generator. `POST /wc/sessions/{id}/model-answer` writes it the first time he opens the section (after the draft review), with the Reviewer's model and its own prompt `model_answer.txt` (the rubric's Level 4, stored History facts or the Language practice text, placeholders for school questions), then saves it in `item.model_answer`. Older sessions keep the one already saved. A separate call from marking, so it does not affect marks.
 - **Facts**: History questions are written ONLY from `writing_coach/data/history_strand_{a,b}.json` (**drafts, need parent review**). Language types in `language_types.json`.
-- **API**: all under `/api/v1/wc/`. Student routes need header `X-Profile-Id` (a grade 7 profile). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, the three-criteria trend, and settings: strand, focus week).
+- **API**: all under `/api/v1/wc/`. Student routes need a signed-in grade 7 child (child access token; the child comes from the token). Parent routes `/api/v1/wc/parent/*` use the admin token (`X-Admin-Token`); the UI is a "Writing Coach" panel on `/admin/<token>` (list of tests + levels, the three-criteria trend, and settings: strand, focus week).
 - **Tables** (`wc_settings`, `wc_sessions`, `wc_submissions`, `wc_reviews`, migration `0002`). Levels: `levels.py` (1- to 4+, percent bands; the Reviewer's level wins, percent is clamped into its band). A correction may fix misread words but not add content (`transcript.py`).
 - **Marking** uses the teacher's rubric (`resources/Written Responses Rubric.pdf`, wording copied into `writing_coach/data/rubric.json`). The Reviewer scores Understanding, Evidence and Communication (level, percent, note, nextStep) and says `hasSpecificEvidence`. The app, not the model, works out `overall` in `Review`: the plain average of the three percents, mapped to a level. Rules from the parent's brief, not the PDF, are constants in `writing_coach/rubric.py`: no quote or specific evidence caps Evidence at 2- and overall at 2+ (`capApplied` only if that changed a mark), and the 5-7 sentence target. Sentence count and repeated openers (3+ sentences starting the same way) are counted by the app (`sentence_stats`), and model answers are checked in sentences (4-8 allowed). R/A/C/E/Extend colours are coaching only. Stored reviews from before the rubric have `scores`/`conventions` instead of `criteria`: they keep their overall level and old report layout, count in error tracking, and are left out of the criteria trends. The `rubric_override` column is unused (removal is covered by `alembic downgrade 0001`).
 - **Writing errors** (inside `criteria.communication`): up to 10 (original, correction, type, category, rule). Errors not found verbatim in the transcript, or on a word the Reader marked `[?]` (ambiguous capital), are dropped. The Reader copies spelling/capitals exactly; at the confirm step he may fix only misread words: capital-only changes are refused (422) and one-word spelling-like fixes are flagged `suspect` in the stored diff (shown to the parent). A COPS edit pass (`EditPass.jsx`) comes before the photo. Personal error tracker: errors grouped by `category` over his latest 5 reviewed drafts, top recurring 3 on the reminder; the rewrite report checks each draft error (`check_fixed_errors`: fixed / still_there / rewritten). Parent panel: draft marks per criterion for his latest 10 drafts with the lowest marked, common errors, corrections list (`GET /wc/parent/progress`).
@@ -71,7 +85,7 @@ npm run dev              # Start dev server at http://localhost:5173
 
 # Test
 npm test                # Watch mode
-npm run test:run        # Single run (176 tests)
+npm run test:run        # Single run (233 tests)
 
 # Quality
 npm run lint            # ESLint
@@ -102,14 +116,15 @@ backend/app/
   core/              shared plumbing
     config.py          settings from env (pydantic-settings)
     db.py              async engine/session, shared SQLAlchemy Base, JsonType, utcnow
-    deps.py            SessionDep, require_admin
+    deps.py            SessionDep, require_admin, require_signed_in (Bearer access token)
     llm.py             ALL LLM calls (call_llm, call_llm_with_usage, LLMServiceError)
     logging_config.py
-  profiles/          GET /profiles/lookup, POST /profiles          (router, service, schemas, models: Profile)
+  account/           /auth/*, GET /me, /children, link codes, /devices  (parent sign-in; router, service, tokens, schemas, models: Parent, AuthIdentity, AuthSession, LinkCode)
+  profiles/          the Profile table (= a child) and shared shapes (service, schemas, models: Profile); no routes
   curriculum/        GET /curriculum                               (router, service, schemas, data/curriculum.json)
   practice/          POST /questions/generate, POST /answers/evaluate
                      (router, question_service, evaluation_service, schemas, prompts/*.txt)
-  results/           POST /attempts, GET /profiles/{id}/lesson-status
+  results/           POST /attempts, GET /me/lesson-status
                      (router, service, schemas, models: LessonProgress, PracticeAttempt)
   admin/             /admin/*  (router, schemas)
   writing_coach/     /wc/*     (router, agents, schemas, models: Wc*, prompts/, data/)
@@ -122,8 +137,8 @@ Inside a feature: `router.py` handles HTTP only (URL, request shape, status code
 ### Frontend (React 18 + Tailwind CSS 3)
 
 **State management**: Single React Context (`SessionContext`) with flat shape — no Redux, no Zustand:
-- Screen enum: `profile` | `home` | `loading` | `practice` | `evaluating` | `dashboard` | `leaderboard` | `about`
-- Actions: `setAgeGroup`, `toggleTopic`, `setQuestionCount`, `startSession`, `startLesson`, `submitAnswers`, `navigateTo`, `resetSession`, `findProfile`, `registerProfile`, `enterProfile`, `switchProfile`
+- Screen enum: `start` | `home` | `lesson` | `loading` | `practice` | `evaluating` | `dashboard` | `leaderboard` | `about` | `writingCoach`
+- Actions: `setAgeGroup`, `toggleTopic`, `setQuestionCount`, `startSession`, `startLesson`, `submitAnswers`, `navigateTo`, `resetSession`, `enterProfile`, `linkWithCode`
 - Session data: questions, answers, evaluation result — all preserved across screens until reset
 
 **No raw `fetch()` in components** — all API calls go through `frontend/src/lib/api.js` (generateQuestions, evaluateAnswers).
@@ -203,7 +218,8 @@ LOG_FORMAT=json                     # For Cloud Logging
 **Important**: The model ID must be `google/gemini-2.0-flash-001`, not `google/gemini-2.0-flash` (invalid on OpenRouter).
 
 ### Frontend (Vite)
-- `VITE_API_URL` — set at build time, no `.env` file needed locally (vite.config.js proxies `/api` to `http://localhost:8000` in dev mode)
+- `VITE_GOOGLE_CLIENT_ID` — Google OAuth client for the parent sign-in button (`frontend/.env.local` locally; a build arg for the production image).
+- `VITE_API_URL` — optional and unused in production: the app calls `/api` on its own address (vite.config.js proxies it to `http://localhost:8000` in dev; nginx proxies it in production).
 
 ---
 
@@ -215,22 +231,22 @@ LOG_FORMAT=json                     # For Cloud Logging
 
 **Deployment steps** (from `deploy-gcp.md`):
 1. Build backend Docker image, push to Artifact Registry, deploy as Cloud Function
-2. Build frontend with `VITE_API_URL=$BACKEND_URL`, push, deploy
+2. Build frontend with `--build-arg VITE_GOOGLE_CLIENT_ID=<production client>`, push, deploy with env `API_UPSTREAM=<backend URL>`
 3. Update backend CORS_ORIGINS env var to include frontend URL
 
-**Key**: Frontend build requires `VITE_API_URL` as a Docker build arg. See `frontend/Dockerfile.prod` and `frontend/nginx.conf` for production setup (two-stage build, Nginx serving static files).
+**Key**: nginx serves the app and proxies `/api/` to the backend (`frontend/nginx.conf.template`, filled from `API_UPSTREAM` at start). See `frontend/Dockerfile.prod` (two-stage build).
 
 ---
 
 ## Testing
 
 ### Backend (pytest)
-- 175 tests (170 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
+- 306 tests (301 pass, 3 skipped, 2 known failures) covering question generation, evaluation, API contracts, profiles, attempts/mastery, admin auth. Two tests in `tests/unit/test_question_service.py` (`test_missing_mandatory_type_raises`, `test_invalid_vedic_pattern_raises`) fail on `main` already: they expect `LLMServiceError`, but `generate_questions` does not raise for these cases (test and code disagree; not fixed yet). DB tests run on in-memory SQLite (`aiosqlite`); Postgres itself is untested in CI.
 - Run: `pytest` from `backend/`
 - Tests use `httpx` for async HTTP testing and `pytest-asyncio`
 
 ### Frontend (Vitest + React Testing Library)
-- 176 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
+- 233 tests covering component rendering, user interactions, session state, the profile flow, lesson picker, mastery messaging and the admin page
 - Run: `npm run test:run` from `frontend/`
 - No snapshot tests — use targeted queries (`getByRole`, `getByText`) to avoid brittle churn
 - All new tests required for redesigned components (AppHeader, HomeScreen, Dashboard, Leaderboard, About)

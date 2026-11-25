@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, act, waitFor } from '@testing-library/react'
 import { SessionProvider, useSession } from './SessionContext'
 import * as api from '../lib/api'
+import * as auth from '../lib/auth'
+import { openParentArea } from '../lib/navigation'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual('../lib/api')
@@ -9,15 +11,22 @@ vi.mock('../lib/api', async () => {
     ...actual,
     generateQuestions: vi.fn(),
     evaluateAnswers: vi.fn(),
-    lookupProfile: vi.fn(),
-    createProfile: vi.fn(),
     fetchCurriculum: vi.fn(),
     fetchLessonStatus: vi.fn(),
     saveAttemptWithRetry: vi.fn(),
   }
 })
 
-const PROFILE = { id: 'p1', email: 'kid@example.com', displayName: 'Sam', grade: '7' }
+vi.mock('../lib/auth', () => ({
+  refreshSession: vi.fn(),
+  linkDevice: vi.fn(),
+  onSignedOut: vi.fn(() => () => {}),
+}))
+vi.mock('../lib/navigation', () => ({ openParentArea: vi.fn() }))
+
+const PROFILE = { id: 'p1', email: null, displayName: 'Sam', grade: '7' }
+const CHILD_ME = { kind: 'child', profile: { id: 'c1', display_name: 'Aarav', grade: '7' } }
+const CHILD = { id: 'c1', email: null, displayName: 'Aarav', grade: '7' }
 const CURRICULUM = [
   { id: 'unit-10', number: 10, title: 'Patterning and Algebra',
     lessons: [
@@ -54,6 +63,7 @@ beforeEach(() => {
   api.generateQuestions.mockResolvedValue({ questions: [QUESTION], fun_facts: ['fact'] })
   api.evaluateAnswers.mockResolvedValue(EVALUATION)
   api.saveAttemptWithRetry.mockResolvedValue(true)
+  auth.refreshSession.mockResolvedValue(null)
 })
 
 async function signIn() {
@@ -62,25 +72,22 @@ async function signIn() {
 }
 
 describe('profile bootstrap', () => {
-  it('starts on the profile screen when nothing is cached', () => {
-    mount()
-    expect(ctx.state.screen).toBe('profile')
-    expect(ctx.state.profile).toBeNull()
-    expect(api.lookupProfile).not.toHaveBeenCalled()
-  })
-
-  it('auto-resumes a cached profile and derives the age group from its grade', async () => {
-    window.localStorage.setItem('mathBuddy.profile', JSON.stringify({ profileId: 'p1', email: PROFILE.email }))
-    api.lookupProfile.mockResolvedValue(PROFILE)
+  it('asks the server first, then shows the profile screen when this browser is not linked', async () => {
     mount()
     expect(ctx.state.profileStatus).toBe('loading')
 
-    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
-    expect(api.lookupProfile).toHaveBeenCalledWith(PROFILE.email)
-    expect(ctx.state.profile).toEqual(PROFILE)
-    expect(ctx.state.ageGroup).toBe('11-12')
-    expect(ctx.state.curriculum).toEqual(CURRICULUM)
-    expect(ctx.state.screen).toBe('home')
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
+    expect(ctx.state.screen).toBe('start')
+    expect(ctx.state.profile).toBeNull()
+  })
+
+  it('forgets the old email sign-in left in localStorage', async () => {
+    window.localStorage.setItem('mathBuddy.profile', JSON.stringify({ profileId: 'p1', email: 'kid@example.com' }))
+    mount()
+
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
+    expect(ctx.state.screen).toBe('start')
+    expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
   })
 
   it('maps grade 6 to the 9-10 age group', async () => {
@@ -90,48 +97,28 @@ describe('profile bootstrap', () => {
     expect(api.fetchCurriculum).toHaveBeenCalledWith('6')
   })
 
-  it('drops a cached profile that no longer exists', async () => {
-    window.localStorage.setItem('mathBuddy.profile', JSON.stringify({ profileId: 'p1', email: PROFILE.email }))
-    api.lookupProfile.mockResolvedValue(null)
-    mount()
-
-    await waitFor(() => expect(ctx.state.screen).toBe('profile'))
-    expect(ctx.state.profile).toBeNull()
-    expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
-  })
-
-  it('caches identity only (no progress data) after entering a profile', async () => {
-    await signIn()
-    expect(JSON.parse(window.localStorage.getItem('mathBuddy.profile'))).toEqual({
-      profileId: 'p1', email: PROFILE.email,
-    })
-  })
-
-  it('shows a retryable error when resuming fails', async () => {
-    window.localStorage.setItem('mathBuddy.profile', JSON.stringify({ profileId: 'p1', email: PROFILE.email }))
-    api.lookupProfile.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(PROFILE)
+  it('shows a retryable error when the linked child cannot be loaded', async () => {
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    api.fetchCurriculum.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(CURRICULUM)
     mount()
 
     await waitFor(() => expect(ctx.state.error).not.toBeNull())
-    expect(ctx.state.screen).toBe('profile')
-
     await act(async () => { ctx.state.error.retryFn() })
-    await waitFor(() => expect(ctx.state.profile).toEqual(PROFILE))
+    await waitFor(() => expect(ctx.state.profile).toEqual(CHILD))
     expect(ctx.state.error).toBeNull()
   })
 
-  it('switchProfile forgets the cached identity', async () => {
-    await signIn()
-    act(() => ctx.switchProfile())
-    expect(ctx.state.screen).toBe('profile')
-    expect(ctx.state.profile).toBeNull()
-    expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
+  it('has no way to switch to another profile', () => {
+    mount()
+    expect(ctx.switchProfile).toBeUndefined()
+    expect(ctx.findProfile).toBeUndefined()
+    expect(ctx.registerProfile).toBeUndefined()
   })
 
   it('detours to the profile screen to practise, then continues to practice', async () => {
     mount()
     act(() => ctx.navigateTo('practice'))
-    expect(ctx.state.screen).toBe('profile')
+    expect(ctx.state.screen).toBe('start')
 
     await act(() => ctx.enterProfile(PROFILE))
     expect(ctx.state.screen).toBe('practice')
@@ -221,8 +208,10 @@ describe('curriculum session', () => {
 
     expect(ctx.state.screen).toBe('dashboard')
     expect(api.saveAttemptWithRetry).toHaveBeenCalledWith(expect.objectContaining({
-      profile_id: 'p1', mode: 'curriculum', lesson_id: '10.3', topic_id: null, score: 2, max_score: 2,
+      mode: 'curriculum', lesson_id: '10.3', topic_id: null, score: 2, max_score: 2,
     }))
+    // The server takes the child from the sign-in, never from the request.
+    expect(api.saveAttemptWithRetry.mock.calls[0][0]).not.toHaveProperty('profile_id')
     await waitFor(() => expect(ctx.state.saveStatus).toBe('saved'))
     await waitFor(() => expect(ctx.state.lessonStatus['10.3']?.completed).toBe(true))
   })
@@ -304,5 +293,78 @@ describe('curriculum session', () => {
       ['Variables in Expressions'], '11-12', 25, '10.3'
     )
     expect(ctx.state.screen).toBe('practice')
+  })
+})
+
+
+describe('linked child device', () => {
+
+  it('goes straight into the child profile when this browser is linked', async () => {
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    mount()
+
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+    expect(ctx.state.profile).toEqual(CHILD)
+    expect(ctx.state.screen).toBe('home')
+    expect(ctx.state.ageGroup).toBe('11-12')
+    // Nothing about the sign-in is kept in localStorage.
+    expect(window.localStorage.getItem('mathBuddy.profile')).toBeNull()
+  })
+
+  it('sends a parent signed in on this browser to the parent area', async () => {
+    auth.refreshSession.mockResolvedValue({ kind: 'parent', parent: {}, children: [] })
+    mount()
+
+    await waitFor(() => expect(openParentArea).toHaveBeenCalled())
+    expect(ctx.state.profile).toBeNull()
+    expect(ctx.state.profileStatus).toBe('loading') // nothing flashes before the page changes
+  })
+
+  it('goes back to the start screen when the device is signed out (unlinked)', async () => {
+    let signedOut
+    auth.onSignedOut.mockImplementation((listener) => {
+      signedOut = listener
+      return () => {}
+    })
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+
+    act(() => signedOut())
+
+    expect(ctx.state.screen).toBe('start')
+    expect(ctx.state.profile).toBeNull()
+    expect(ctx.state.profileStatus).toBe('none')
+    expect(ctx.state.signedOut).toBe(true)
+  })
+
+  it('a new code clears the signed-out note', async () => {
+    let signedOut
+    auth.onSignedOut.mockImplementation((listener) => {
+      signedOut = listener
+      return () => {}
+    })
+    auth.refreshSession.mockResolvedValue(CHILD_ME)
+    auth.linkDevice.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('ready'))
+    act(() => signedOut())
+
+    await act(() => ctx.linkWithCode('7K4Q-9PXM'))
+
+    expect(ctx.state.signedOut).toBe(false)
+    expect(ctx.state.screen).toBe('home')
+  })
+
+  it('links this browser with a code and enters the child profile', async () => {
+    auth.linkDevice.mockResolvedValue(CHILD_ME)
+    mount()
+    await waitFor(() => expect(ctx.state.profileStatus).toBe('none'))
+
+    await act(() => ctx.linkWithCode('7K4Q-9PXM'))
+
+    expect(auth.linkDevice).toHaveBeenCalledWith('7K4Q-9PXM')
+    expect(ctx.state.profile).toEqual(CHILD)
+    expect(ctx.state.screen).toBe('home')
   })
 })
