@@ -609,7 +609,7 @@ async def parent_progress(session: SessionDep, profile_id: Annotated[uuid.UUID, 
         trend.append({
             "date": _iso(s.created_at),
             "subject": s.subject,
-            **_marks_of(draft_rev),
+            **(_marks_of(draft_rev) or {}),  # rows without marks were filtered out above
             "overall": {"level": draft_rev.level, "percent": draft_rev.percent},
             "cap_applied": draft_rev.review["overall"]["capApplied"],
             "errors_flagged": len(fixed) if fixed is not None else None,
