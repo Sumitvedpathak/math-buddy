@@ -3,9 +3,14 @@ import { useEffect, useRef, useState } from 'react'
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 let gisLoading = null
 
+/** Google Identity Services, once its script has loaded (`window.google` is not typed). */
+function googleIdentity() {
+  return /** @type {any} */ (window).google?.accounts?.id
+}
+
 /** Load Google Identity Services once per page. */
 function loadGoogleScript() {
-  if (window.google?.accounts?.id) return Promise.resolve()
+  if (googleIdentity()) return Promise.resolve()
   if (!gisLoading) {
     gisLoading = new Promise((resolve, reject) => {
       const script = document.createElement('script')
@@ -42,11 +47,12 @@ export default function GoogleButton({ onCredential }) {
     loadGoogleScript()
       .then(() => {
         if (cancelled || !container.current) return
-        window.google.accounts.id.initialize({
+        const identity = googleIdentity()
+        identity.initialize({
           client_id: clientId,
           callback: (response) => callback.current(response.credential),
         })
-        window.google.accounts.id.renderButton(container.current, {
+        identity.renderButton(container.current, {
           theme: 'filled_black',
           size: 'large',
           shape: 'pill',

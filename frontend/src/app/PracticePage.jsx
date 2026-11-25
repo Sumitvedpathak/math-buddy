@@ -117,7 +117,7 @@ export default function PracticePage() {
         </div>
       </div>
 
-      {error && <ErrorBanner message={error.message ?? error} onRetry={() => submitAnswers(answers)} />}
+      {error && <ErrorBanner message={typeof error === 'string' ? error : error.message} onRetry={() => submitAnswers(answers)} />}
 
       {/* Empty-submission confirmation */}
       {confirming && (

@@ -15,7 +15,7 @@ function friendlyError(status, detail) {
   let message = `Something went wrong (${status}). Please try again.`
   if (typeof detail === 'string' && detail) message = detail
   else if (Array.isArray(detail) && detail[0]?.msg) message = detail[0].msg
-  const err = new Error(message)
+  const err = /** @type {Error & {status?: number, detail?: any}} */ (new Error(message))
   err.status = status
   return err
 }
@@ -30,8 +30,14 @@ async function asChild(method, path, body) {
   }
 }
 
-/** A call from the admin page. */
-async function request(method, path, { adminToken, body } = {}) {
+/**
+ * A call from the admin page.
+ * @param {string} method
+ * @param {string} path
+ * @param {{ adminToken?: string, body?: any }} [options]
+ */
+async function request(method, path, { adminToken = undefined, body = undefined } = {}) {
+  /** @type {Record<string, string>} */
   const headers = {}
   if (adminToken) headers['X-Admin-Token'] = adminToken
   if (body !== undefined) headers['Content-Type'] = 'application/json'

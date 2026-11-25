@@ -5,11 +5,14 @@
  * @property {"multiplication"|"division"|"fractions"|"mixed_fractions"|"squares"} problemType
  * @property {string} text
  * @property {number} difficultyTier
+ * @property {string} [problem_type] - as the server sends it
+ * @property {number} [difficulty_tier] - as the server sends it
  */
 
 /**
  * @typedef {Object} Answer
  * @property {string} questionId
+ * @property {string} [question_id] - as the server sends it
  * @property {"sketch"|"text"} mode
  * @property {string} content
  */
@@ -53,7 +56,7 @@ async function getJson(url, headers = {}) {
   const response = await fetch(`${BASE_URL}${url}`, { headers })
   if (!response.ok) {
     const detail = await response.text()
-    const err = new Error(`API error ${response.status}: ${detail}`)
+    const err = /** @type {Error & {status?: number, detail?: any}} */ (new Error(`API error ${response.status}: ${detail}`))
     err.status = response.status
     throw err
   }
@@ -217,8 +220,13 @@ export function addChild({ displayName, grade }) {
   return authFetch('/children', { method: 'POST', body: { display_name: displayName, grade } })
 }
 
-/** Rename a child and/or change their grade. Only the fields given are sent. */
-export function updateChild(childId, { displayName, grade } = {}) {
+/**
+ * Rename a child and/or change their grade. Only the fields given are sent.
+ * @param {string} childId
+ * @param {{ displayName?: string, grade?: string }} [changes]
+ */
+export function updateChild(childId, { displayName = undefined, grade = undefined } = {}) {
+  /** @type {Record<string, string>} */
   const body = {}
   if (displayName !== undefined) body.display_name = displayName
   if (grade !== undefined) body.grade = grade
