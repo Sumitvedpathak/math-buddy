@@ -24,7 +24,8 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        # ruff and mypy are not app requirements; pinned so a new release cannot turn CI red.
+        run: pip install -r requirements.txt ruff==0.17.6 mypy==2.4.1
 
       - name: Lint (ruff)
         run: ruff check .

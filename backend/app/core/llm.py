@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -31,19 +32,21 @@ FAILED_MESSAGE = "The AI helper ran into a problem. Please try again."
 
 def _get_model(model: str | None = None, temperature: float | None = None):
     """Get the LangChain Router model. `model`/`temperature` override the env defaults."""
-    kwargs = {} if temperature is None else {"temperature": temperature}
-    return ChatOpenAI(
-        model=model or OPENROUTER_MODEL,
-        api_key=OPENROUTER_API_KEY,
-        base_url="https://openrouter.ai/api/v1",
-        max_retries=MAX_RETRIES,
-        timeout=REQUEST_TIMEOUT_S,
-        **kwargs)
+    kwargs: dict[str, Any] = {
+        "model": model or OPENROUTER_MODEL,
+        "api_key": OPENROUTER_API_KEY,
+        "base_url": "https://openrouter.ai/api/v1",
+        "max_retries": MAX_RETRIES,
+        "timeout": REQUEST_TIMEOUT_S,
+    }
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    return ChatOpenAI(**kwargs)
 
-def _filter_images(prompt: str, images: list[str] | None) -> list[str]:
+def _filter_images(prompt: str, images: list[str] | None) -> list[dict[str, Any]]:
     """Filter the images to be sent to the LangChain Router model."""
     content: list[dict] = [{"type": "text", "text": prompt}]
-    for data_uri in images:
+    for data_uri in images or []:
         content.append({
             "type": "image_url",
             "image_url": {"url": data_uri},
@@ -86,6 +89,7 @@ async def call_llm_with_usage(
     """
     llm = _get_model(model, temperature)
 
+    messages: list[dict[str, Any]]
     if images:
         messages = _filter_images(prompt, images)
     else:

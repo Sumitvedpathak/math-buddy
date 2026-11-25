@@ -5,19 +5,21 @@ Unit tests for evaluation_service.py:
 - Missing answers get 0 marks
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from app.practice.evaluation_service import evaluate_answers
-from app.practice.schemas import EvaluateAnswersRequest
-from app.practice.schemas import QuestionSchema
+from app.practice.schemas import EvaluateAnswersRequest, QuestionSchema
 
 
 def _make_request(questions=None, answers=None):
     if questions is None:
         questions = [
             QuestionSchema(id="q1", topic="Algebra", problem_type="division", text="144÷12", difficulty_tier=1),
-            QuestionSchema(id="q2", topic="Vedic Maths", problem_type="multiplication", text="13×17", difficulty_tier=2),
+            QuestionSchema(
+                id="q2", topic="Vedic Maths", problem_type="multiplication", text="13×17", difficulty_tier=2
+            ),
         ]
     if answers is None:
         answers = []

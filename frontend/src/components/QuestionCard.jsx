@@ -6,11 +6,13 @@ import FractionText from './FractionText'
  * QuestionCard — EduSpark two-column layout.
  * Left: question prompt. Right: mode toggle + answer area.
  *
- * @param {{ id: string, topic: string, text: string, difficulty_tier: number }} question
- * @param {{ mode: "sketch"|"text", content: string }|null} answer
- * @param {(questionId: string, mode: "sketch"|"text", content: string) => void} onAnswer
- * @param {number} questionNumber - 1-based display index
- * @param {number} [total] - total question count for position display
+ * @param {{
+ *   question: { id: string, topic: string, text: string, difficulty_tier?: number },
+ *   answer: { mode: "sketch"|"text", content: string }|null,
+ *   onAnswer: (questionId: string, mode: "sketch"|"text", content: string) => void,
+ *   questionNumber: number,
+ *   total?: number,
+ * }} props - questionNumber is 1-based; total is the question count, for "3 of 25"
  */
 export default function QuestionCard({ question, answer, onAnswer, questionNumber, total }) {
   const [mode, setMode] = useState(/** @type {"sketch"|"text"} */ ('text'))

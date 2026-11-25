@@ -31,7 +31,7 @@ async def test_curriculum_has_all_units_and_lessons(client):
     assert resp.status_code == 200
     units = resp.json()["units"]
     assert [u["number"] for u in units] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    lesson_ids = [l["id"] for u in units for l in u["lessons"]]
+    lesson_ids = [lesson["id"] for u in units for lesson in u["lessons"]]
     assert len(lesson_ids) == 58
     assert len(set(lesson_ids)) == 58
     for unit in units:
@@ -42,7 +42,7 @@ async def test_curriculum_has_all_units_and_lessons(client):
 
 async def test_every_lesson_has_theory_pages(client):
     units = (await client.get("/api/v1/curriculum", headers=CHILD())).json()["units"]
-    counts = {l["id"]: l["theory_pages"] for u in units for l in u["lessons"]}
+    counts = {lesson["id"]: lesson["theory_pages"] for u in units for lesson in u["lessons"]}
     assert len(counts) == 58
     assert all(isinstance(n, int) and n >= 1 for n in counts.values())
 

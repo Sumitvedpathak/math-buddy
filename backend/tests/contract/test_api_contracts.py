@@ -3,14 +3,13 @@ Contract tests: verify the API response bodies match their documented JSON schem
 These tests run against the FastAPI TestClient with mocked OpenRouter calls.
 """
 
-import json
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
-from tests.kids import CHILD
-
 from app.main import app
+from tests.kids import CHILD
 
 client = TestClient(app, headers=CHILD())  # practice needs a signed-in child
 

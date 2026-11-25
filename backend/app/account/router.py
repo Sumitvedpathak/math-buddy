@@ -129,7 +129,7 @@ async def _parent_me(session, parent: Parent) -> ParentMe:
 def _device_out(device: AuthSession) -> DeviceOut:
     return DeviceOut(
         session_id=device.id,
-        device_name=device.device_name,
+        device_name=device.device_name or "Unknown device",
         created_at=device.created_at,
         last_used_at=device.last_used_at,
     )
@@ -137,11 +137,15 @@ def _device_out(device: AuthSession) -> DeviceOut:
 
 async def _me_for_session(session, auth_session: AuthSession) -> ParentMe | ChildMe:
     if auth_session.kind == "child":
+        if auth_session.child_profile_id is None:  # a child session always has one
+            raise ChildNotFound()
         child = await get_child(
             session, auth_session.parent_id, auth_session.child_profile_id
         )
         return ChildMe(profile=ChildOut.model_validate(child))
     parent = await get_parent(session, auth_session.parent_id)
+    if parent is None:  # cannot happen (foreign key)
+        raise RefreshFailed("session without a parent")
     return await _parent_me(session, parent)
 
 
@@ -154,10 +158,15 @@ async def _signed_in(
 ) -> SignedIn:
     """Access token in the body; refresh token in a cookie (web) or the body (native)."""
     settings = get_settings()
-    is_child = auth_session.kind == "child"
+    secret = settings.jwt_secret
+    if not secret:
+        raise HTTPException(status_code=503, detail="Sign-in is not configured.")
+    sub = auth_session.child_profile_id if auth_session.kind == "child" else auth_session.parent_id
+    if sub is None:  # a child session always has a child
+        raise ChildNotFound()
     access = issue_access_token(
-        settings.jwt_secret,
-        sub=auth_session.child_profile_id if is_child else auth_session.parent_id,
+        secret,
+        sub=sub,
         kind=auth_session.kind,
         pid=auth_session.parent_id,
         sid=auth_session.id,

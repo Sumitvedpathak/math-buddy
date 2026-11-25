@@ -84,7 +84,7 @@ function Overview({ overview }) {
 
 function SessionDetail({ profileId, row, onBack, onRewrite }) {
   const [report, setReport] = useState(null)
-  const [kind, setKind] = useState('draft')
+  const [kind, setKind] = useState(/** @type {'draft'|'rewrite'} */ ('draft'))
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -104,7 +104,7 @@ function SessionDetail({ profileId, row, onBack, onRewrite }) {
       </section>
       {hasRewrite && (
         <div role="tablist" className="flex gap-2">
-          {['draft', 'rewrite'].map((k) => (
+          {/** @type {const} */ (['draft', 'rewrite']).map((k) => (
             <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
               className={`rounded-md border px-4 py-2 text-sm capitalize ${kind === k ? 'border-primary bg-primary/10 text-ink' : 'border-border text-ink-soft'}`}>
               {k}
@@ -128,7 +128,7 @@ export default function History({ profileId, onBack, onNew, onRewrite }) {
   const [open, setOpen] = useState(null)
 
   useEffect(() => {
-    Promise.all([wc.listSessions(profileId), wc.overview(profileId)])
+    Promise.all([wc.listSessions(), wc.overview()])
       .then(([list, ov]) => { setRows(list); setOverview(ov) })
       .catch((e) => setError(e.message))
   }, [profileId])

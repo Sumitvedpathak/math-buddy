@@ -82,7 +82,7 @@ function writeWritingCoachOpen(open) {
   }
 }
 
-/** @type {React.Context<any>} */
+/** @type {import('react').Context<any>} */
 export const SessionContext = createContext(null)
 
 const INITIAL_STATE = {
@@ -120,7 +120,7 @@ function carryOver(s) {
 }
 
 /**
- * @param {{ children: React.ReactNode }} props
+ * @param {{ children: import('react').ReactNode }} props
  */
 export function SessionProvider({ children }) {
   // 'loading' first: the server is asked whether this browser is a linked child device.
@@ -423,7 +423,8 @@ export function SessionProvider({ children }) {
   )
 }
 
-/** @returns {{ state: SessionState, actions: typeof import('./SessionContext').actions }} */
+/** The state plus every action (startLesson, navigateTo, ...) side by side.
+ * @returns {{ state: SessionState } & Record<string, any>} */
 export function useSession() {
   const ctx = useContext(SessionContext)
   if (!ctx) throw new Error('useSession must be used within SessionProvider')

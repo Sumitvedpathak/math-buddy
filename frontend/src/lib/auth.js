@@ -34,7 +34,9 @@ const signedOutListeners = new Set()
  */
 export function onSignedOut(listener) {
   signedOutListeners.add(listener)
-  return () => signedOutListeners.delete(listener)
+  return () => {
+    signedOutListeners.delete(listener)
+  }
 }
 
 export function getAccessToken() {
@@ -54,7 +56,9 @@ async function readError(response) {
   } catch {
     // not JSON
   }
-  const err = new Error(typeof detail === 'string' ? detail : `API error ${response.status}`)
+  const err = /** @type {Error & {status?: number, detail?: any}} */ (
+    new Error(typeof detail === 'string' ? detail : `API error ${response.status}`)
+  )
   err.status = response.status
   err.detail = detail
   return err
@@ -125,8 +129,11 @@ export async function signOut() {
 /**
  * Authenticated JSON request. On a 401 it refreshes once and retries once.
  * Throws an error with `.status` when it still fails.
+ *
+ * @param {string} path - under /api/v1, e.g. '/me'
+ * @param {{ method?: string, body?: any }} [options] - `body` is sent as JSON
  */
-export async function authFetch(path, { method = 'GET', body } = {}) {
+export async function authFetch(path, { method = 'GET', body = undefined } = {}) {
   const send = () =>
     fetch(`${BASE_URL}${path}`, {
       method,

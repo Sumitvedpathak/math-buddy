@@ -4,12 +4,13 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 from fastapi.concurrency import run_in_threadpool
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import CursorResult, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.account.models import AuthIdentity, AuthSession, LinkCode, Parent
@@ -109,6 +110,8 @@ async def sign_in_with_google(
     )
     if identity is not None:
         parent = await session.get(Parent, identity.parent_id)
+        if parent is None:  # cannot happen (foreign key), but never sign in to nothing
+            raise SignInFailed("identity without a parent")
         parent.email = user.email  # a Google account's email can change
         parent.last_login_at = now
         await session.commit()
@@ -353,17 +356,20 @@ async def create_link_code(
             LinkCode.created_at > now - timedelta(hours=1),
         )
     )
-    if made_last_hour >= LINK_CODES_PER_HOUR:
+    if (made_last_hour or 0) >= LINK_CODES_PER_HOUR:
         raise TooManyLinkCodes()
 
     await _cancel_codes(session, child_id, now)
     code = new_link_code()
+    normalized = normalize_link_code(code)
+    if normalized is None:  # cannot happen: new_link_code() makes a valid code
+        raise RuntimeError("new_link_code() made a code it cannot read back")
     expires_at = now + LINK_CODE_TTL
     session.add(
         LinkCode(
             child_profile_id=child_id,
             parent_id=parent_id,
-            code_hash=hash_link_code(normalize_link_code(code)),
+            code_hash=hash_link_code(normalized),
             expires_at=expires_at,
             created_at=now,
         )
@@ -419,12 +425,12 @@ async def redeem_link_code(
         raise CodeNotValid(f"code {row.id} used, cancelled or expired")
     # Mark used only if still unused: two devices typing the same code at once
     # cannot both win.
-    claimed = await session.execute(
+    claimed = await session.execute(  # an UPDATE gives a CursorResult, which has rowcount
         update(LinkCode)
         .where(LinkCode.id == row.id, LinkCode.used_at.is_(None))
         .values(used_at=now)
     )
-    if claimed.rowcount != 1:
+    if cast("CursorResult[Any]", claimed).rowcount != 1:
         raise CodeNotValid(f"code {row.id} already used")
     child = await session.get(Profile, row.child_profile_id)
     if child is None or child.parent_id != row.parent_id:

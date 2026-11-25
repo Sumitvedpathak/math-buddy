@@ -49,10 +49,22 @@ PENDING_STAGES = {"question", "draft_check", "rewrite_check"}
 ERROR_WINDOW = 5  # the personal error tracker looks at his latest 5 reviewed practices
 TREND_WINDOW = 10  # the parent's criteria table shows his latest 10 drafts
 FOCUS_WEEKS = {
-    1: ("Decode, Restate, Answer", "Circle the command word, count the parts, restate the question in your first sentence, and answer every part."),
-    2: ("Cite and Explain", "Use two pieces of evidence, and after each one explain how it proves your point (two evidence-and-explain pairs)."),
+    1: (
+        "Decode, Restate, Answer",
+        "Circle the command word, count the parts, restate the question in your first sentence, "
+        "and answer every part.",
+    ),
+    2: (
+        "Cite and Explain",
+        "Use two pieces of evidence, and after each one explain how it proves your point "
+        "(two evidence-and-explain pairs).",
+    ),
     3: ("Extend", "Add one deeper idea: another group's view, the author's craft, or a link to today."),
-    4: ("Timed, test-style", "Work like it is a test. Write your answer, then mark yourself against the list before you see any feedback."),
+    4: (
+        "Timed, test-style",
+        "Work like it is a test. Write your answer, then mark yourself against the list "
+        "before you see any feedback.",
+    ),
 }
 
 
@@ -418,7 +430,9 @@ async def read_photos(session_id: uuid.UUID, data: ReadRequest, profile: Profile
 
 
 @router.put("/submissions/{submission_id}/transcript")
-async def confirm_transcript(submission_id: uuid.UUID, data: TranscriptUpdate, profile: ProfileDep, session: SessionDep):
+async def confirm_transcript(
+    submission_id: uuid.UUID, data: TranscriptUpdate, profile: ProfileDep, session: SessionDep
+):
     sub, _ = await owned_submission(session, submission_id, profile.id)
     if await review_for(session, sub.id) is not None:
         raise HTTPException(status_code=409, detail="This answer has already been reviewed.")
@@ -595,7 +609,7 @@ async def parent_progress(session: SessionDep, profile_id: Annotated[uuid.UUID, 
         trend.append({
             "date": _iso(s.created_at),
             "subject": s.subject,
-            **_marks_of(draft_rev),
+            **(_marks_of(draft_rev) or {}),  # rows without marks were filtered out above
             "overall": {"level": draft_rev.level, "percent": draft_rev.percent},
             "cap_applied": draft_rev.review["overall"]["capApplied"],
             "errors_flagged": len(fixed) if fixed is not None else None,

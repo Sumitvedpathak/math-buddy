@@ -54,6 +54,7 @@ function recallRewriting() {
 /**
  * Where a pending practice should pick up, or null if it is finished.
  * A practice is finished once its results are shown, whether or not he rewrites it.
+ * @returns {{ step: string, kind: 'draft'|'rewrite', submission?: object } | null}
  */
 export function stepFromReport(report, { rewriting = false } = {}) {
   const { session, submissions } = report
@@ -93,7 +94,7 @@ export default function WritingCoach() {
   const [step, setStep] = useState('loading')
   const [reminder, setReminder] = useState(null)
   const [session, setSession] = useState(null)
-  const [kind, setKind] = useState('draft')
+  const [kind, setKind] = useState(/** @type {'draft'|'rewrite'} */ ('draft'))
   const [report, setReport] = useState(null)
   const [submission, setSubmission] = useState(null) // { id, transcript }
   const [images, setImages] = useState(null) // browser only; never stored
@@ -162,7 +163,7 @@ export default function WritingCoach() {
   const goToStart = useCallback(() => {
     setError(null)
     setStep('start')
-    wc.reminder(profileId).then(setReminder).catch(() => {})
+    wc.reminder().then(setReminder).catch(() => {})
   }, [profileId])
 
   // Load the reminder, and resume an unfinished session after a refresh.
@@ -171,7 +172,7 @@ export default function WritingCoach() {
     let cancelled = false
     ;(async () => {
       try {
-        const rem = await wc.reminder(profileId)
+        const rem = await wc.reminder()
         if (cancelled) return
         setReminder(rem)
         const activeId = recallActive()

@@ -3,7 +3,7 @@ import { CRITERIA_LABELS, STEPS, STEP_BY_KEY, colourSegments, missingSteps } fro
 const card = 'rounded-2xl bg-card ring-soft p-6'
 const h2 = 'font-display text-xl font-semibold text-ink'
 
-function Section({ title, children, label }) {
+function Section({ title, children, label = undefined }) {
   return (
     <section className={card} aria-label={label || title}>
       <h2 className={h2}>{title}</h2>
